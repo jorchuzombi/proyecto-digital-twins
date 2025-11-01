@@ -1,0 +1,42 @@
+🕐 [Fri Oct 17 23:23:59 COT 2025]
+👤 Usuario: daf 
+📧 Email: gruendgru@gmail.com
+🔑 Token: 477b8244-08e9-428a-8dd9-ed23259f39fb
+🔗 Enlace: http://localhost:3000/reset-password?token=477b8244-08e9-428a-8dd9-ed23259f39fb
+────────────────────────────────────────────────────────────
+
+🕐 [Fri Oct 17 23:27:37 COT 2025]
+👤 Usuario: daf 
+📧 Email: gruendgru@gmail.com
+🔑 Token: 777360f2-9d7c-42d9-a6bb-ea8eb672f8d8
+🔗 Enlace: http://localhost:3000/reset-password?token=777360f2-9d7c-42d9-a6bb-ea8eb672f8d8
+────────────────────────────────────────────────────────────
+
+🕐 [Fri Oct 17 23:29:01 COT 2025]
+👤 Usuario: daf 
+📧 Email: gruendgru@gmail.com
+🔑 Token: 20789487-2eed-45ca-b7d0-bf85e30a14e8
+🔗 Enlace: http://localhost:3000/reset-password?token=20789487-2eed-45ca-b7d0-bf85e30a14e8
+────────────────────────────────────────────────────────────
+
+🕐 [Fri Oct 17 23:36:01 COT 2025]
+👤 Usuario: daf 
+📧 Email: gruendgru@gmail.com
+🔑 Token: 50809d99-bd72-46c7-910f-6bfec9bb3d7a
+🔗 Enlace: http://localhost:3000/reset-password?token=50809d99-bd72-46c7-910f-6bfec9bb3d7a
+────────────────────────────────────────────────────────────
+
+🕐 [Fri Oct 17 23:37:33 COT 2025]
+👤 Usuario: daf 
+📧 Email: gruendgru@gmail.com
+🔑 Token: aeabab42-ac54-43f1-a35c-61d845af4c22
+🔗 Enlace: http://localhost:3000/reset-password?token=aeabab42-ac54-43f1-a35c-61d845af4c22
+────────────────────────────────────────────────────────────
+
+🕐 [Sat Oct 18 00:03:12 COT 2025]
+👤 Usuario: daf 
+📧 Email: gruendgru@gmail.com
+🔑 Token: 5fde83cb-ed8d-46da-ab1d-98dd7d6be680
+🔗 Enlace: http://localhost:3000/reset-password?token=5fde83cb-ed8d-46da-ab1d-98dd7d6be680
+────────────────────────────────────────────────────────────
+
