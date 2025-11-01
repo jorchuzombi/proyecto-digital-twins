@@ -1,0 +1,254 @@
+<!-- src/app/features/drivers/pages/driver-form/driver-form.component.html -->
+
+<div class="form-container">
+  <!-- Header -->
+  <div class="form-header">
+    <button class="btn-back" (click)="goBack()">
+      <i class="fas fa-arrow-left"></i>
+    </button>
+    <div class="header-title">
+      <i class="fas fa-user-plus"></i>
+      <h1>{{ isEditMode ? 'Editar Conductor' : 'Nuevo Conductor' }}</h1>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="loading" class="loading-overlay">
+    <div class="spinner"></div>
+    <p>Cargando...</p>
+  </div>
+
+  <!-- Formulario -->
+  <form [formGroup]="driverForm" (ngSubmit)="onSubmit()" *ngIf="!loading" class="driver-form">
+    <!-- Información Personal -->
+    <div class="form-section">
+      <div class="section-header">
+        <i class="fas fa-user"></i>
+        <h2>Información Personal</h2>
+      </div>
+
+      <div class="form-grid">
+        <!-- Nombre -->
+        <div class="form-group">
+          <label for="nombre">
+            Nombre <span class="required">*</span>
+          </label>
+          <input
+            type="text"
+            id="nombre"
+            class="form-control"
+            formControlName="nombre"
+            placeholder="Ingresa el nombre"
+            [class.invalid]="isFieldInvalid('nombre')"
+          />
+          <span class="error-message" *ngIf="isFieldInvalid('nombre')">
+            {{ getFieldError('nombre') }}
+          </span>
+        </div>
+
+        <!-- Apellido -->
+        <div class="form-group">
+          <label for="apellido">
+            Apellido <span class="required">*</span>
+          </label>
+          <input
+            type="text"
+            id="apellido"
+            class="form-control"
+            formControlName="apellido"
+            placeholder="Ingresa el apellido"
+            [class.invalid]="isFieldInvalid('apellido')"
+          />
+          <span class="error-message" *ngIf="isFieldInvalid('apellido')">
+            {{ getFieldError('apellido') }}
+          </span>
+        </div>
+
+        <!-- Teléfono -->
+        <div class="form-group">
+          <label for="telefono">
+            Teléfono <span class="required">*</span>
+          </label>
+          <input
+            type="tel"
+            id="telefono"
+            class="form-control"
+            formControlName="telefono"
+            placeholder="+57 300 123 4567"
+            [class.invalid]="isFieldInvalid('telefono')"
+          />
+          <span class="error-message" *ngIf="isFieldInvalid('telefono')">
+            {{ getFieldError('telefono') }}
+          </span>
+        </div>
+
+        <!-- Email -->
+        <div class="form-group">
+          <label for="email">
+            Email <span class="required">*</span>
+          </label>
+          <input
+            type="email"
+            id="email"
+            class="form-control"
+            formControlName="email"
+            placeholder="conductor@ejemplo.com"
+            [class.invalid]="isFieldInvalid('email')"
+          />
+          <span class="error-message" *ngIf="isFieldInvalid('email')">
+            {{ getFieldError('email') }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Información de Licencia -->
+    <div class="form-section">
+      <div class="section-header">
+        <i class="fas fa-id-card"></i>
+        <h2>Información de Licencia</h2>
+      </div>
+
+      <div class="form-grid">
+        <!-- Número de Licencia -->
+        <div class="form-group">
+          <label for="licencia">
+            Número de Licencia <span class="required">*</span>
+          </label>
+          <input
+            type="text"
+            id="licencia"
+            class="form-control"
+            formControlName="licencia"
+            placeholder="ABC123456"
+            [class.invalid]="isFieldInvalid('licencia')"
+            [attr.disabled]="isEditMode ? true : null"
+          />
+          <span class="error-message" *ngIf="isFieldInvalid('licencia')">
+            {{ getFieldError('licencia') }}
+          </span>
+          <small class="field-hint" *ngIf="isEditMode">
+            El número de licencia no se puede modificar
+          </small>
+        </div>
+
+        <!-- Tipo de Licencia -->
+        <div class="form-group">
+          <label for="tipoLicencia">
+            Tipo de Licencia <span class="required">*</span>
+          </label>
+          <select
+            id="tipoLicencia"
+            class="form-control"
+            formControlName="tipoLicencia"
+            [class.invalid]="isFieldInvalid('tipoLicencia')"
+          >
+            <option value="">Selecciona un tipo</option>
+            <option *ngFor="let tipo of tiposLicencia" [value]="tipo.value">
+              {{ tipo.label }}
+            </option>
+          </select>
+          <span class="error-message" *ngIf="isFieldInvalid('tipoLicencia')">
+            {{ getFieldError('tipoLicencia') }}
+          </span>
+        </div>
+
+        <!-- Fecha de Vencimiento -->
+        <div class="form-group full-width">
+          <label for="fechaVencimientoLicencia">
+            Fecha de Vencimiento <span class="required">*</span>
+          </label>
+          <input
+            type="date"
+            id="fechaVencimientoLicencia"
+            class="form-control"
+            formControlName="fechaVencimientoLicencia"
+            [class.invalid]="isFieldInvalid('fechaVencimientoLicencia')"
+          />
+          <span class="error-message" *ngIf="isFieldInvalid('fechaVencimientoLicencia')">
+            {{ getFieldError('fechaVencimientoLicencia') }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Estado y Disponibilidad (solo en modo edición) -->
+    <div class="form-section" *ngIf="isEditMode">
+      <div class="section-header">
+        <i class="fas fa-toggle-on"></i>
+        <h2>Estado y Disponibilidad</h2>
+      </div>
+
+      <div class="form-grid">
+        <!-- Estado -->
+        <div class="form-group">
+          <label for="estado">Estado</label>
+          <select id="estado" class="form-control" formControlName="estado">
+            <option *ngFor="let estado of estados" [value]="estado">
+              {{ estado }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Disponibilidad -->
+        <div class="form-group">
+          <label for="disponibilidad">Disponibilidad</label>
+          <select id="disponibilidad" class="form-control" formControlName="disponibilidad">
+            <option *ngFor="let disp of disponibilidades" [value]="disp">
+              {{ disp.replace('_', ' ') }}
+            </option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Botones de acción -->
+    <div class="form-actions">
+      <button
+        type="button"
+        class="btn btn-secondary"
+        (click)="goBack()"
+        [disabled]="submitting"
+      >
+        <i class="fas fa-times"></i>
+        Cancelar
+      </button>
+
+      <button
+        type="button"
+        class="btn btn-outline"
+        (click)="resetForm()"
+        [disabled]="submitting"
+        *ngIf="!isEditMode"
+      >
+        <i class="fas fa-redo"></i>
+        Limpiar
+      </button>
+
+      <button
+        type="submit"
+        class="btn btn-primary"
+        [disabled]="submitting || driverForm.invalid"
+      >
+        <i class="fas" [class.fa-spinner]="submitting" [class.fa-spin]="submitting" [class.fa-save]="!submitting"></i>
+        {{ submitting ? 'Guardando...' : (isEditMode ? 'Actualizar' : 'Crear') }}
+      </button>
+    </div>
+  </form>
+
+  <!-- Información adicional -->
+  <div class="form-info" *ngIf="!loading">
+    <div class="info-card">
+      <i class="fas fa-info-circle"></i>
+      <div class="info-content">
+        <h3>Información importante</h3>
+        <ul>
+          <li>Todos los campos marcados con <span class="required">*</span> son obligatorios</li>
+          <li>El número de licencia debe ser único y no se puede modificar después de crear el conductor</li>
+          <li>La fecha de vencimiento debe ser posterior a la fecha actual</li>
+          <li>Los conductores nuevos se crean con estado ACTIVO y disponibilidad DISPONIBLE por defecto</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>

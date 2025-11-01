@@ -8,5 +8,5 @@ import { RouterOutlet } from '@angular/router';
   styleUrl: './app.css'
 })
 export class App {
-  protected readonly title = signal('gemelo-digital-frontend');
+  protected readonly title = signal('Sistema de Gestión de Rutas Logísticas');
 }

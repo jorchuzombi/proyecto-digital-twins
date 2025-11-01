@@ -1,0 +1,149 @@
+<div class="reports-container">
+  <!-- Header Section -->
+  <div class="reports-header">
+    <div class="header-content">
+      <h1>
+        <span class="header-icon">📊</span>
+        Reportes y Análisis
+      </h1>
+      <p class="header-subtitle">
+        Visualiza y gestiona todos los reportes de eficiencia, finanzas y operaciones de tus rutas
+      </p>
+    </div>
+    <button class="btn-primary" (click)="generateNewReport()">
+      <span class="btn-icon">➕</span>
+      Generar Reporte
+    </button>
+  </div>
+
+  <!-- Stats Section -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon total">
+        📈
+      </div>
+      <div class="stat-info">
+        <h3>{{ reports.length }}</h3>
+        <p>Total de Reportes</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon active">
+        ⚡
+      </div>
+      <div class="stat-info">
+        <h3>{{ getReportsByType('efficiency').length }}</h3>
+        <p>Reportes de Eficiencia</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon optimized">
+        💰
+      </div>
+      <div class="stat-info">
+        <h3>{{ getReportsByType('financial').length }}</h3>
+        <p>Reportes Financieros</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon revenue">
+        🚚
+      </div>
+      <div class="stat-info">
+        <h3>{{ getReportsByType('operational').length }}</h3>
+        <p>Reportes Operacionales</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters Section -->
+  <div class="filters-card">
+    <div class="filters-header">
+      <h3>Filtrar Reportes</h3>
+      <button class="btn-clear" (click)="selectedReportType = 'all'">
+        Limpiar Filtros
+      </button>
+    </div>
+    <div class="filters-grid">
+      <div class="filter-group">
+        <label class="filter-label">Tipo de Reporte</label>
+        <select
+          class="filter-select"
+          [(ngModel)]="selectedReportType"
+          (change)="onFilterChange()">
+          <option *ngFor="let type of reportTypes" [value]="type.value">
+            {{ type.label }}
+          </option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="loading-state">
+    <div class="spinner"></div>
+    <h3>Cargando Reportes</h3>
+    <p>Estamos preparando tus análisis...</p>
+  </div>
+
+  <!-- Reports Grid -->
+  <div *ngIf="!loading && filteredReports.length > 0" class="reports-grid">
+    <div *ngFor="let report of filteredReports" class="report-card">
+      <div class="report-header">
+        <div class="report-type">
+          <span class="status-badge" [class]="getReportTypeBadge(report.type)">
+            {{ getReportTypeText(report.type) }}
+          </span>
+        </div>
+        <div class="report-actions">
+          <button class="btn-action view" (click)="viewReport(report)" title="Ver Reporte">
+            👁️
+          </button>
+          <button class="btn-action download" (click)="downloadReport(report)" title="Descargar">
+            ⬇️
+          </button>
+          <button class="btn-action share" (click)="shareReport(report)" title="Compartir">
+            📤
+          </button>
+        </div>
+      </div>
+
+      <div class="report-content">
+        <h3 class="report-title">{{ report.title }}</h3>
+        <div class="report-meta">
+          <div class="meta-item">
+            <span class="meta-label">Período:</span>
+            <span class="meta-value">{{ report.period }}</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Generado:</span>
+            <span class="meta-value">{{ formatDate(report.generatedDate) }}</span>
+          </div>
+        </div>
+
+        <div class="report-data">
+          <div *ngFor="let key of getDataKeys(report.data)" class="data-item">
+            <span class="data-label">{{ getDataLabel(key) }}:</span>
+            <span class="data-value">{{ formatDataValue(report.data[key]) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="report-footer">
+        <button class="btn-view-full" (click)="viewReport(report)">
+          Ver Reporte Completo
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!loading && filteredReports.length === 0" class="empty-state">
+    <div class="empty-icon">📊</div>
+    <h3>No se encontraron reportes</h3>
+    <p>No hay reportes que coincidan con los filtros seleccionados.</p>
+    <button class="btn-primary" (click)="selectedReportType = 'all'">
+      Ver Todos los Reportes
+    </button>
+  </div>
+</div>

@@ -1,0 +1,238 @@
+<div class="register-container">
+    <div class="neural-network"></div>
+    <div class="particles" id="particles"></div>
+
+    <div class="register-content">
+        <!-- Columna Izquierda - Logo y Título -->
+        <div class="left-section">
+            <div class="logo-section">
+                <div class="ai-icon">⚡</div>
+                <h1 class="title-main">Sistema de Gestión de Rutas Logísticas<br><span class="title-digital">Digital</span></h1>
+            </div>
+
+            <div class="tech-badge">
+                <div class="neural-text"></div>
+                <div class="ai-text"></div>
+            </div>
+        </div>
+
+        <!-- Columna Derecha - Formulario -->
+        <div class="right-section">
+            <form class="form-container" (ngSubmit)="onRegister()" #registerForm="ngForm">
+                <div class="form-header">
+                    <h2 class="form-title">Registro</h2>
+                    <div class="form-subtitle">
+                        <span class="user-label">nueva cuenta</span>
+                    </div>
+                </div>
+
+                <!-- Campos del formulario -->
+                <div class="form-group">
+                    <input
+                        type="text"
+                        class="form-input"
+                        placeholder="Nombre de usuario *"
+                        [(ngModel)]="userData.username"
+                        name="username"
+                        autocomplete="username"
+                        required>
+                </div>
+
+                <div class="form-group">
+                    <input
+                        type="email"
+                        class="form-input"
+                        placeholder="Correo electrónico *"
+                        [(ngModel)]="userData.email"
+                        name="email"
+                        autocomplete="email"
+                        required>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group half">
+                        <input
+                            type="text"
+                            class="form-input"
+                            placeholder="Nombre *"
+                            [(ngModel)]="userData.firstName"
+                            name="firstName"
+                            autocomplete="given-name"
+                            required>
+                    </div>
+
+                    <div class="form-group half">
+                        <input
+                            type="text"
+                            class="form-input"
+                            placeholder="Apellido *"
+                            [(ngModel)]="userData.lastName"
+                            name="lastName"
+                            autocomplete="family-name"
+                            required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <input
+                        type="password"
+                        class="form-input"
+                        placeholder="Contraseña *"
+                        [(ngModel)]="userData.password"
+                        name="password"
+                        autocomplete="new-password"
+                        required
+                        (input)="checkPasswordStrength()">
+                </div>
+
+                <!-- Indicador de fuerza de contraseña -->
+                <div *ngIf="userData.password" class="password-strength">
+                    <div class="strength-bar">
+                        <div class="strength-fill" [class]="getPasswordStrengthClass()"
+                             [style.width.%]="getPasswordStrengthPercent()"></div>
+                    </div>
+                    <div class="strength-requirements">
+                        <div class="requirement" [class.valid]="passwordStrength.minLength">
+                            ✅ Mínimo 8 caracteres
+                        </div>
+                        <div class="requirement" [class.valid]="passwordStrength.hasUpperCase">
+                            ✅ Una mayúscula
+                        </div>
+                        <div class="requirement" [class.valid]="passwordStrength.hasLowerCase">
+                            ✅ Una minúscula
+                        </div>
+                        <div class="requirement" [class.valid]="passwordStrength.hasNumber">
+                            ✅ Un número
+                        </div>
+                        <div class="requirement" [class.valid]="passwordStrength.hasSpecialChar">
+                            ✅ Un carácter especial
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <input
+                        type="password"
+                        class="form-input"
+                        placeholder="Confirmar contraseña *"
+                        [(ngModel)]="userData.confirmPassword"
+                        name="confirmPassword"
+                        autocomplete="new-password"
+                        required>
+                </div>
+
+                <!-- Botón de Registro -->
+                <button
+                    type="submit"
+                    class="register-btn"
+                    [disabled]="loading || !isFormValid() || !isPasswordStrong()"
+                    [class.loading]="loading">
+                    <div class="btn-content">
+                        <span *ngIf="!loading">Crear Cuenta</span>
+                        <span *ngIf="loading">
+                            <div class="spinner"></div>
+                            Creando cuenta...
+                        </span>
+                    </div>
+                </button>
+
+                <!-- Botón Google -->
+                <div class="google-section">
+                    <div class="divider">
+                        <span>o regístrate con</span>
+                    </div>
+                    <div class="google-button-container">
+                        <div id="googleButton" class="google-button"></div>
+                        <div *ngIf="googleLoading" class="google-loading">
+                            <div class="spinner"></div>
+                            Autenticando con Google...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notificaciones -->
+                <div *ngIf="showErrorNotification" class="notification error">
+                    <div class="notification-content">
+                        <span class="notification-icon">⚠️</span>
+                        <div class="notification-text">
+                            <strong>Error en el registro</strong>
+                            <p>{{ error }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Enlace para volver al login -->
+                <div class="login-link">
+                    <p>¿Ya tienes cuenta? <a routerLink="/login" class="login-btn-text">Iniciar Sesión</a></p>
+                </div>
+
+                <div class="footer-bottom">
+                    <div class="interna-text">interna</div>
+                    <div class="ai-cover">
+                        <span class="covered">covered</span>
+                        <span class="by-ai">by AI</span>
+                        <span class="neural-networks">Neural Networks</span>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ✅ MODAL DE ÉXITO - AGREGADO AQUÍ -->
+    <div *ngIf="showSuccessModal" class="success-modal-overlay">
+        <div class="success-modal">
+            <div class="success-animation">
+                <div class="checkmark-circle">
+                    <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                        <circle class="checkmark-circle-bg" cx="26" cy="26" r="25" fill="none"/>
+                        <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="success-content">
+                <h2 class="success-title">¡Bienvenido a bordo! 🎉</h2>
+                <p class="success-message">Tu cuenta ha sido creada exitosamente</p>
+
+                <div class="user-info-card">
+                    <div class="avatar-container">
+                        <div class="avatar">
+                            {{ getInitials() }}
+                        </div>
+                        <div class="avatar-glow"></div>
+                    </div>
+
+                    <div class="user-details">
+                        <h3 class="user-name">{{ userData.firstName }} {{ userData.lastName }}</h3>
+                        <p class="user-email">{{ userData.email }}</p>
+                    </div>
+                </div>
+
+                <div class="success-features">
+                    <div class="feature-item">
+                        <span class="feature-icon">🚀</span>
+                        <span class="feature-text">Acceso completo al sistema</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-icon">📊</span>
+                        <span class="feature-text">Dashboard personalizado</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-icon">🔒</span>
+                        <span class="feature-text">Cuenta 100% segura</span>
+                    </div>
+                </div>
+
+                <div class="redirect-info">
+                    <div class="spinner-small"></div>
+                    <p>Redirigiendo al dashboard en <span class="countdown">{{ countdown }}</span> segundos...</p>
+                </div>
+
+                <button class="success-btn" (click)="goToDashboard()">
+                    Ir al Dashboard Ahora
+                    <span class="btn-arrow">→</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
