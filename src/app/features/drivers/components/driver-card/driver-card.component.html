@@ -1,0 +1,106 @@
+<!-- src/app/features/drivers/components/driver-card/driver-card.component.html -->
+
+<div class="driver-card">
+  <!-- Header con Avatar -->
+  <div class="card-header">
+    <div class="driver-avatar">
+      {{ getInitials() }}
+    </div>
+    <div class="driver-info">
+      <h3 class="driver-name">{{ driver.nombre }} {{ driver.apellido }}</h3>
+      <div class="driver-badges">
+        <span class="badge" [ngClass]="getEstadoBadgeClass()">
+          {{ driver.estado }}
+        </span>
+        <span class="badge" [ngClass]="getDisponibilidadBadgeClass()">
+          {{ formatDisponibilidad() }}
+        </span>
+      </div>
+    </div>
+    <div class="status-indicator" [ngClass]="getStatusColor()">
+      <i class="fas" [ngClass]="getStatusIcon()"></i>
+    </div>
+  </div>
+
+  <!-- Información de Licencia -->
+  <div class="card-body">
+    <div class="info-section">
+      <div class="info-item">
+        <i class="fas fa-id-card"></i>
+        <div class="info-content">
+          <span class="info-label">Licencia</span>
+          <span class="info-value">{{ driver.licencia }}</span>
+        </div>
+      </div>
+
+      <div class="info-item">
+        <i class="fas fa-certificate"></i>
+        <div class="info-content">
+          <span class="info-label">Tipo</span>
+          <span class="info-value">{{ driver.tipoLicencia }}</span>
+        </div>
+      </div>
+
+      <div class="info-item">
+        <i class="fas fa-calendar-alt"></i>
+        <div class="info-content">
+          <span class="info-label">Vencimiento</span>
+          <span
+            class="info-value"
+            [class.expired]="!driver.licenciaVigente"
+          >
+            {{ driver.fechaVencimientoLicencia | date: 'dd/MM/yyyy' }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Información de Contacto -->
+    <div class="contact-section">
+      <div class="contact-item">
+        <i class="fas fa-phone"></i>
+        <span>{{ driver.telefono }}</span>
+      </div>
+      <div class="contact-item">
+        <i class="fas fa-envelope"></i>
+        <span>{{ driver.email }}</span>
+      </div>
+    </div>
+
+    <!-- Indicadores de Estado -->
+    <div class="indicators">
+      <div
+        class="indicator"
+        [class.active]="driver.licenciaVigente"
+        [class.inactive]="!driver.licenciaVigente"
+      >
+        <i class="fas fa-id-badge"></i>
+        <span>Licencia {{ driver.licenciaVigente ? 'Vigente' : 'Vencida' }}</span>
+      </div>
+      <div
+        class="indicator"
+        [class.active]="driver.disponibleParaRuta"
+        [class.inactive]="!driver.disponibleParaRuta"
+      >
+        <i class="fas fa-route"></i>
+        <span>{{ driver.disponibleParaRuta ? 'Disponible' : 'No disponible' }} para rutas</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer con Acciones -->
+  <div class="card-footer">
+    <button class="btn-action btn-view" (click)="onView()" title="Ver detalles">
+      <i class="fas fa-eye"></i>
+      <span>Ver</span>
+    </button>
+    <button class="btn-action btn-edit" (click)="onEdit()" title="Editar">
+      <i class="fas fa-edit"></i>
+      <span>Editar</span>
+    </button>
+    <button class="btn-action btn-delete" (click)="onDelete()" title="Eliminar">
+      <i class="fas fa-trash"></i>
+      <span>Eliminar</span>
+    </button>
+  </div>
+</div>

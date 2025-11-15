@@ -1,0 +1,214 @@
+<div class="login-container">
+    <div class="neural-network"></div>
+    <div class="particles" id="particles"></div>
+
+    <div class="login-content">
+        <!-- Columna Izquierda - Logo y Título -->
+        <div class="left-section">
+            <div class="logo-section">
+                <div class="ai-icon">⚡</div>
+                <h1 class="title-main">Sistema de Gestión de Rutas Logísticas<br><span class="title-digital">Digital</span></h1>
+            </div>
+
+            <div class="tech-badge">
+                <div class="neural-text"></div>
+                <div class="ai-text">Inteligencia Integrada</div>
+            </div>
+        </div>
+
+        <!-- Columna Derecha - Formulario -->
+        <div class="right-section">
+            <!-- ✅ FORMULARIO CORREGIDO -->
+            <form class="form-container" (ngSubmit)="onLogin()" #loginForm="ngForm">
+                <div class="form-header">
+                    <h2 class="form-title">Sistema</h2>
+                    <div class="form-subtitle">
+                        <span class="user-label">usuario</span>
+                        <span class="password-label">contraseña</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <input
+                        type="text"
+                        class="form-input"
+                        placeholder="admin"
+                        [(ngModel)]="username"
+                        name="username"
+                        autocomplete="username"
+                        required
+                        [class.error]="error">
+                </div>
+
+                <div class="form-group">
+                    <input
+                        type="password"
+                        class="form-input"
+                        placeholder="••••••••"
+                        [(ngModel)]="password"
+                        name="password"
+                        autocomplete="current-password"
+                        required
+                        [class.error]="error">
+                </div>
+
+                <button
+                    type="submit"
+                    class="login-btn"
+                    [disabled]="loading || !username || !password"
+                    [class.loading]="loading">
+
+                    <div class="btn-content">
+                        <span *ngIf="!loading">Ingresar</span>
+                        <span *ngIf="loading">
+                            <div class="spinner"></div>
+                            Conectando...
+                        </span>
+                    </div>
+                </button>
+
+                <!-- ✅ ENLACE DE OLVIDAR CONTRASEÑA -->
+                <div class="forgot-password-section">
+                    <a (click)="openForgotPassword()" class="forgot-password-link">
+                        ¿Olvidaste tu contraseña?
+                    </a>
+                </div>
+
+                <!-- ✅ ENLACE DE REGISTRO -->
+                <div class="register-link">
+                    <p>¿No tienes cuenta? <a routerLink="/register" class="register-btn">Crear cuenta nueva</a></p>
+                </div>
+
+                <!-- ✅ MENSAJE DE ERROR MEJORADO -->
+                <div *ngIf="error" class="error-message-enhanced">
+                    <div class="error-icon">🔐</div>
+                    <div class="error-content">
+                        <h3 class="error-title">Acceso Denegado</h3>
+                        <p class="error-text">{{ error }}</p>
+                        <div class="error-hint">
+                            <span class="hint-icon">💡</span>
+                            Verifica que tus credenciales sean correctas
+                        </div>
+                    </div>
+                    <div class="error-animation"></div>
+                </div>
+
+                <div class="footer-bottom">
+                    <div class="interna-text">interna</div>
+                    <div class="ai-cover">
+                        <span class="covered">covered</span>
+                        <span class="by-ai">by AI</span>
+                        <span class="neural-networks">Neural Networks</span>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Olvidar Contraseña -->
+    <div *ngIf="showForgotPassword" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Recuperar Contraseña</h3>
+                <button (click)="closeForgotPassword()" class="close-btn">&times;</button>
+            </div>
+
+            <div class="modal-body">
+                <p>Ingresa tu email y te enviaremos un enlace para restablecer tu contraseña.</p>
+
+                <div class="form-group">
+                    <input
+                        type="email"
+                        [(ngModel)]="forgotPasswordEmail"
+                        placeholder="tu@email.com"
+                        class="form-input">
+                </div>
+
+                <!-- Mensajes de éxito/error -->
+                <div *ngIf="forgotPasswordSuccess" class="success-message">
+                    ✅ Si el email existe, recibirás un enlace para restablecer tu contraseña.
+                </div>
+
+                <div *ngIf="forgotPasswordError" class="error-message">
+                    {{ forgotPasswordError }}
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button
+                    (click)="closeForgotPassword()"
+                    class="btn btn-secondary">
+                    Cancelar
+                </button>
+                <button
+                    (click)="onForgotPassword()"
+                    [disabled]="forgotPasswordLoading || !forgotPasswordEmail"
+                    class="btn btn-primary"
+                    [class.loading]="forgotPasswordLoading">
+                    {{ forgotPasswordLoading ? 'Enviando...' : 'Enviar' }}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Resetear Contraseña -->
+    <div *ngIf="showResetPassword" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Crear Nueva Contraseña</h3>
+                <button (click)="closeResetPassword()" class="close-btn">&times;</button>
+            </div>
+
+            <div class="modal-body">
+                <form [formGroup]="resetPasswordForm" (ngSubmit)="onResetPassword()">
+                    <div class="form-group">
+                        <input
+                            type="password"
+                            formControlName="newPassword"
+                            placeholder="Nueva contraseña"
+                            class="form-input">
+                        <div *ngIf="resetPasswordForm.get('newPassword')?.touched && resetPasswordForm.get('newPassword')?.invalid" class="field-error">
+                            La contraseña debe tener al menos 6 caracteres
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <input
+                            type="password"
+                            formControlName="confirmPassword"
+                            placeholder="Confirmar contraseña"
+                            class="form-input">
+                        <div *ngIf="resetPasswordForm.get('confirmPassword')?.touched && resetPasswordForm.get('confirmPassword')?.hasError('passwordMismatch')" class="field-error">
+                            Las contraseñas no coinciden
+                        </div>
+                    </div>
+
+                    <!-- Mensajes de éxito/error -->
+                    <div *ngIf="resetPasswordSuccess" class="success-message">
+                        ✅ Contraseña restablecida exitosamente. Redirigiendo al login...
+                    </div>
+
+                    <div *ngIf="resetPasswordError" class="error-message">
+                        {{ resetPasswordError }}
+                    </div>
+
+                    <div class="modal-actions">
+                        <button
+                            type="button"
+                            (click)="closeResetPassword()"
+                            class="btn btn-secondary">
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            [disabled]="resetPasswordLoading || resetPasswordForm.invalid"
+                            class="btn btn-primary"
+                            [class.loading]="resetPasswordLoading">
+                            {{ resetPasswordLoading ? 'Restableciendo...' : 'Restablecer' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

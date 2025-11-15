@@ -1,0 +1,67 @@
+<div class="autocomplete-container">
+  <!-- Input de búsqueda -->
+  <div class="search-input-wrapper">
+    <span class="search-icon">🔍</span>
+    <input
+      type="text"
+      [(ngModel)]="searchQuery"
+      (input)="onSearchChange($event)"
+      (focus)="onFocus()"
+      (blur)="onBlur()"
+      [placeholder]="placeholder"
+      class="search-input"
+      autocomplete="off"
+    />
+
+    <!-- Botón para limpiar -->
+    <button
+      *ngIf="searchQuery"
+      (click)="clearSearch()"
+      class="clear-button"
+      type="button"
+    >
+      ✕
+    </button>
+
+    <!-- Indicador de carga -->
+    <span *ngIf="isLoading" class="loading-spinner">⏳</span>
+  </div>
+
+  <!-- Dropdown con resultados -->
+  <div
+    *ngIf="showDropdown && (results.length > 0 || isLoading || noResults)"
+    class="dropdown-results"
+  >
+    <!-- Mensaje de carga -->
+    <div *ngIf="isLoading" class="dropdown-item loading">
+      <span class="spinner">⏳</span>
+      Buscando direcciones...
+    </div>
+
+    <!-- Mensaje sin resultados -->
+    <div *ngIf="noResults && !isLoading" class="dropdown-item no-results">
+      <span class="icon">❌</span>
+      No se encontraron resultados para "{{ searchQuery }}"
+    </div>
+
+    <!-- Lista de resultados -->
+    <div
+      *ngFor="let result of results; let i = index"
+      class="dropdown-item"
+      [class.highlighted]="highlightedIndex === i"
+      (mousedown)="selectResult(result)"
+      (mouseenter)="highlightedIndex = i"
+    >
+      <div class="result-icon">📍</div>
+      <div class="result-content">
+        <div class="result-name">{{ result.display_name }}</div>
+        <div class="result-details" *ngIf="result.address">
+          <span *ngIf="result.address.road">{{ result.address.road }}</span>
+          <span *ngIf="result.address.suburb"> • {{ result.address.suburb }}</span>
+          <span *ngIf="result.address.city"> • {{ result.address.city }}</span>
+        </div>
+      </div>
+      <div class="result-type">{{ getResultType(result) }}</div>
+    </div>
+  </div>
+</div>

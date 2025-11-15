@@ -1,0 +1,413 @@
+<div class="route-form-container">
+  <!-- Loading State -->
+  <div *ngIf="loading" class="loading-state">
+    <div class="spinner"></div>
+    <h3>{{ isEditMode ? 'Cargando ruta...' : 'Preparando formulario...' }}</h3>
+    <p>Estamos {{ isEditMode ? 'cargando los datos de la ruta' : 'preparando el mapa y formulario' }}</p>
+  </div>
+
+  <!-- Form Content -->
+  <div *ngIf="!loading" class="form-content">
+    <!-- Header -->
+    <div class="form-header">
+      <div class="header-content">
+        <h1>
+          <span class="header-icon">{{ isEditMode ? '✏️' : '➕' }}</span>
+          {{ isEditMode ? 'Editar Ruta' : 'Nueva Ruta' }}
+        </h1>
+        <p class="header-subtitle">
+          {{ isEditMode ? 'Modifica los detalles de la ruta existente' : 'Crea una nueva ruta de entrega' }}
+        </p>
+
+        <!-- Validation Status -->
+        <div class="validation-panel" *ngIf="!isFormValid()">
+          <h4>⚠️ Para activar el botón "Crear Ruta", completa:</h4>
+          <ul>
+            <li [class.completed]="!!formData.name.trim()">
+              <span class="validation-icon">{{ !!formData.name.trim() ? '✅' : '❌' }}</span>
+              <strong>Nombre de la ruta</strong>
+            </li>
+            <li [class.completed]="!!formData.driver.trim()">
+              <span class="validation-icon">{{ !!formData.driver.trim() ? '✅' : '❌' }}</span>
+              <strong>Conductor</strong> - Selecciona uno de la lista
+            </li>
+            <li [class.completed]="!!formData.vehicle.trim()">
+              <span class="validation-icon">{{ !!formData.vehicle.trim() ? '✅' : '❌' }}</span>
+              <strong>Vehículo</strong> - Selecciona uno de la lista
+            </li>
+            <li [class.completed]="!!formData.city.trim()">
+              <span class="validation-icon">{{ !!formData.city.trim() ? '✅' : '❌' }}</span>
+              <strong>Ciudad</strong> - Selecciona una ciudad
+            </li>
+            <li [class.completed]="formData.stops.length >= 1">
+              <span class="validation-icon">{{ formData.stops.length >= 1 ? '✅' : '❌' }}</span>
+              <strong>Al menos 1 parada</strong> (actual: {{ formData.stops.length }})
+            </li>
+          </ul>
+        </div>
+
+        <!-- Debug Info -->
+        <div class="debug-info" *ngIf="!isFormValid()">
+          <small>🔍 Estado del formulario:
+            Nombre: "{{formData.name || 'Vacío'}}",
+            Conductor: "{{formData.driver || 'Vacío'}}",
+            Vehículo: "{{formData.vehicle || 'Vacío'}}",
+            Ciudad: "{{formData.city || 'Vacío'}}",
+            Paradas: {{formData.stops.length}}
+          </small>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="btn-secondary" (click)="onCancel()">
+          ❌ Cancelar
+        </button>
+        <button class="btn-primary" (click)="onSubmit()" [disabled]="!isFormValid()">
+          {{ isEditMode ? '💾 Actualizar' : '✅ Crear' }} Ruta
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="main-content">
+      <!-- Left Column - Form -->
+      <div class="form-section">
+        <!-- Basic Information -->
+        <div class="form-card">
+          <h3>📋 Información Básica</h3>
+          <div class="form-grid">
+            <div class="form-group" [class.has-error]="!formData.name.trim()">
+              <label for="route-name">Nombre de la Ruta *</label>
+              <input
+                id="route-name"
+                type="text"
+                [(ngModel)]="formData.name"
+                (input)="onFormChange()"
+                placeholder="Ej: Ruta Norte Bogotá"
+                class="form-control"
+              >
+              <div class="error-message" *ngIf="!formData.name.trim()">
+                ⚠️ El nombre de la ruta es obligatorio
+              </div>
+            </div>
+
+            <div class="form-group" [class.has-error]="!formData.driver.trim()">
+              <label for="route-driver">Conductor *</label>
+              <select
+                id="route-driver"
+                [(ngModel)]="formData.driver"
+                (change)="onFormChange()"
+                class="form-control"
+              >
+                <option value="">-- Seleccionar conductor --</option>
+                <option *ngFor="let driver of driverOptions" [value]="driver">
+                  {{ driver }}
+                </option>
+              </select>
+              <div class="error-message" *ngIf="!formData.driver.trim()">
+                ⚠️ Debes seleccionar un conductor
+              </div>
+              <div class="help-text" *ngIf="driverOptions.length === 0">
+                🔄 Cargando conductores...
+              </div>
+            </div>
+
+            <div class="form-group" [class.has-error]="!formData.vehicle.trim()">
+              <label for="route-vehicle">Vehículo *</label>
+              <select
+                id="route-vehicle"
+                [(ngModel)]="formData.vehicle"
+                (change)="onFormChange()"
+                class="form-control"
+              >
+                <option value="">-- Seleccionar vehículo --</option>
+                <option *ngFor="let vehicle of vehicleOptions" [value]="vehicle">
+                  {{ vehicle }}
+                </option>
+              </select>
+              <div class="error-message" *ngIf="!formData.vehicle.trim()">
+                ⚠️ Debes seleccionar un vehículo
+              </div>
+              <div class="help-text" *ngIf="vehicleOptions.length === 0">
+                🔄 Cargando vehículos...
+              </div>
+            </div>
+
+            <div class="form-group" [class.has-error]="!formData.city.trim()">
+              <label for="route-city">Ciudad *</label>
+              <select
+                id="route-city"
+                [(ngModel)]="formData.city"
+                (change)="onCityChange(); onFormChange()"
+                class="form-control"
+              >
+                <option value="">-- Seleccionar ciudad --</option>
+                <option *ngFor="let city of cityOptions" [value]="city">
+                  {{ city }}
+                </option>
+              </select>
+              <div class="error-message" *ngIf="!formData.city.trim()">
+                ⚠️ Debes seleccionar una ciudad
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stops Management -->
+        <div class="form-card">
+          <div class="section-header">
+            <h3>📍 Gestión de Paradas</h3>
+            <div class="section-actions">
+              <span class="stops-count" [class.warning]="formData.stops.length === 0">
+                {{ formData.stops.length }} parada(s)
+              </span>
+              <button type="button" class="btn-danger" (click)="clearStops()" [disabled]="formData.stops.length === 0">
+                🗑️ Limpiar Todo
+              </button>
+            </div>
+          </div>
+
+          <!-- Add/Edit Stop Form -->
+          <div class="stop-form">
+            <h4>{{ editingStopIndex !== null ? '✏️ Editar Parada' : '➕ Agregar Nueva Parada' }}</h4>
+
+            <div class="stop-instructions">
+              <p>💡 <strong>Para agregar una parada:</strong></p>
+              <ol>
+                <li>Haz clic en el mapa para seleccionar ubicación</li>
+                <li>Completa el nombre y dirección</li>
+                <li>Haz clic en "Agregar Parada"</li>
+              </ol>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group" [class.has-error]="!currentStop.name.trim()">
+                <label for="stop-name">Nombre de la Parada *</label>
+                <input
+                  id="stop-name"
+                  type="text"
+                  [(ngModel)]="currentStop.name"
+                  (input)="onStopFormChange()"
+                  placeholder="Ej: Cliente Corporativo A"
+                  class="form-control"
+                >
+                <div class="error-message" *ngIf="!currentStop.name.trim()">
+                  ⚠️ El nombre de la parada es obligatorio
+                </div>
+              </div>
+
+              <!-- ✅ AGREGADO: Búsqueda inteligente de direcciones -->
+              <div class="form-group address-search-group" [class.has-error]="!currentStop.address.trim()">
+                <label for="stop-address">🔍 Dirección * (búsqueda inteligente)</label>
+
+                <div class="address-input-container">
+                  <input
+                    id="stop-address"
+                    type="text"
+                    [(ngModel)]="currentStop.address"
+                    (input)="onAddressInput(currentStop.address)"
+                    (focus)="showAddressResults = addressSearchResults.length > 0"
+                    placeholder="Empieza a escribir la dirección..."
+                    class="form-control"
+                    autocomplete="off"
+                  >
+
+                  <!-- Spinner de búsqueda -->
+                  <span class="search-spinner" *ngIf="isSearchingAddress">
+                    🔄 Buscando...
+                  </span>
+                </div>
+
+                <!-- Resultados de búsqueda -->
+                <div class="address-results" *ngIf="showAddressResults && addressSearchResults.length > 0">
+                  <div class="address-results-header">
+                    <strong>Direcciones encontradas:</strong>
+                    <button type="button" class="close-results" (click)="showAddressResults = false">×</button>
+                  </div>
+                  <div class="address-results-list">
+                    <button
+                      type="button"
+                      class="address-result-item"
+                      *ngFor="let result of addressSearchResults"
+                      (click)="selectAddress(result)"
+                    >
+                      <span class="result-icon">📍</span>
+                      <div class="result-content">
+                        <div class="result-name">
+                          {{ result.address.road || result.address.city || 'Dirección' }}
+                          {{ result.address.house_number || '' }}
+                        </div>
+                        <div class="result-full-address">
+                          {{ result.display_name }}
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                  <div class="address-results-footer">
+                    💡 Haz clic en una dirección para seleccionarla
+                  </div>
+                </div>
+
+                <!-- Ayuda -->
+                <div class="help-section">
+                  <small class="help-text">
+                    💡 <strong>3 formas de agregar una dirección:</strong>
+                  </small>
+                  <ol class="help-list">
+                    <li>📝 <strong>Escribe</strong> y selecciona de la lista</li>
+                    <li>🗺️ <strong>Haz clic en el mapa</strong> (obtendrá la dirección automáticamente)</li>
+                    <li>📍 <strong>Ingresa manualmente</strong> si conoces la dirección exacta</li>
+                  </ol>
+                </div>
+
+                <div class="error-message" *ngIf="!currentStop.address.trim()">
+                  ⚠️ La dirección es obligatoria
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="stop-type">Tipo de Parada</label>
+                <select
+                  id="stop-type"
+                  [(ngModel)]="currentStop.type"
+                  class="form-control"
+                >
+                  <option *ngFor="let type of stopTypeOptions" [value]="type">
+                    {{ getStopTypeText(type) }}
+                  </option>
+                </select>
+              </div>
+
+              <div class="form-group" [class.has-error]="!currentStop.latitude || currentStop.latitude === 0">
+                <label>Coordenadas *</label>
+                <div class="coordinates-display" [class.error]="!currentStop.latitude || currentStop.latitude === 0">
+                  {{ currentStop.latitude && currentStop.latitude !== 0 ? currentStop.latitude.toFixed(4) + ', ' + currentStop.longitude.toFixed(4) : 'No seleccionadas' }}
+                </div>
+                <small class="help-text">💡 Haz clic en el mapa para seleccionar ubicación</small>
+                <div class="error-message" *ngIf="!currentStop.latitude || currentStop.latitude === 0">
+                  ⚠️ Debes seleccionar una ubicación en el mapa
+                </div>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button
+                type="button"
+                class="btn-secondary"
+                (click)="resetCurrentStop()"
+                [disabled]="!currentStop.name && !currentStop.address && (!currentStop.latitude || currentStop.latitude === 0)"
+              >
+                🔄 Limpiar Formulario
+              </button>
+
+              <!-- Botón para editar parada existente - SOLO visible cuando está editando -->
+              <button
+                *ngIf="editingStopIndex !== null"
+                type="button"
+                class="btn-warning"
+                (click)="updateStop()"
+                [disabled]="!isCurrentStopValid()"
+              >
+                💾 Actualizar Parada
+              </button>
+
+              <!-- Botón para agregar nueva parada - SOLO visible cuando NO está editando -->
+              <button
+                *ngIf="editingStopIndex === null"
+                type="button"
+                class="btn-success"
+                (click)="addStop()"
+                [disabled]="!isCurrentStopValid()"
+              >
+                ➕ Agregar Parada
+              </button>
+            </div>
+
+            <!-- Debug info para paradas -->
+            <div class="debug-info" *ngIf="!isCurrentStopValid()">
+              <small>🔍 Estado de la parada:
+                Nombre: "{{currentStop.name || 'Vacío'}}",
+                Dirección: "{{currentStop.address || 'Vacío'}}",
+                Coordenadas: {{currentStop.latitude && currentStop.latitude !== 0 ? 'Sí' : 'No'}}
+              </small>
+            </div>
+          </div>
+
+          <!-- Stops List -->
+          <div class="stops-list" *ngIf="formData.stops.length > 0">
+            <h4>📋 Paradas Agregadas ({{ formData.stops.length }})</h4>
+            <div class="stops-container">
+              <div *ngFor="let stop of formData.stops; let i = index" class="stop-item">
+                <div class="stop-info">
+                  <div class="stop-marker">
+                    <span [ngSwitch]="stop.type">
+                      <span *ngSwitchCase="'PICKUP'">🟢</span>
+                      <span *ngSwitchCase="'DELIVERY'">🔵</span>
+                      <span *ngSwitchCase="'STOP'">🟡</span>
+                    </span>
+                    <span class="stop-order">#{{ i + 1 }}</span>
+                  </div>
+                  <div class="stop-details">
+                    <strong>{{ stop.name }}</strong>
+                    <small>{{ stop.address }}</small>
+                    <small class="coordinates">📍 {{ stop.latitude.toFixed(4) }}, {{ stop.longitude.toFixed(4) }}</small>
+                  </div>
+                </div>
+                <div class="stop-actions">
+                  <button class="btn-edit" (click)="editStop(i)" title="Editar parada">
+                    ✏️
+                  </button>
+                  <button class="btn-delete" (click)="removeStop(i)" title="Eliminar parada">
+                    🗑️
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty State for Stops -->
+          <div class="empty-state" *ngIf="formData.stops.length === 0">
+            <div class="empty-icon">📍</div>
+            <h4>No hay paradas agregadas</h4>
+            <p>Agrega al menos una parada para poder crear la ruta</p>
+            <p><strong>Instrucciones:</strong></p>
+            <ol>
+              <li>Haz clic en el mapa a la derecha</li>
+              <li>Completa el nombre y dirección</li>
+              <li>Haz clic en "Agregar Parada"</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column - Map -->
+      <div class="map-section">
+        <div class="map-card">
+          <div class="section-header">
+            <h3>🗺️ Mapa de la Ruta</h3>
+            <div class="map-actions">
+              <button type="button" class="btn-info" (click)="onOptimize()" [disabled]="formData.stops.length < 2">
+                ⚡ Optimizar Ruta
+              </button>
+              <button type="button" class="btn-secondary" (click)="resetMap()">
+                🔄 Reiniciar Mapa
+              </button>
+            </div>
+          </div>
+
+          <div id="route-map" class="route-map"></div>
+
+          <div class="map-instructions">
+            <p>💡 <strong>Instrucciones del Mapa:</strong></p>
+            <ul>
+              <li><strong>Haz clic en el mapa</strong> para agregar una parada</li>
+              <li>Completa los datos en el formulario de la izquierda</li>
+              <li>Haz clic en "Agregar Parada" para confirmar</li>
+              <li>Haz clic en los marcadores para editar o eliminar</li>
+              <li>Usa "Optimizar" cuando tengas 2+ paradas</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

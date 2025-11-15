@@ -1,0 +1,254 @@
+<!-- route-list.component.html -->
+<div class="routes-container">
+  <!-- Header -->
+  <div class="routes-header">
+    <div class="header-content">
+      <h1>
+        <span class="header-icon">🚚</span>
+        Gestión de Rutas
+      </h1>
+      <p class="header-subtitle">Optimiza y gestiona todas las rutas de entrega</p>
+    </div>
+    <button class="btn-primary" (click)="navigateToNewRoute()">
+      <span class="btn-icon">➕</span>
+      Nueva Ruta
+    </button>
+  </div>
+
+  <!-- Estadísticas Rápidas -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon total">📊</div>
+      <div class="stat-info">
+        <h3>{{ routes.length }}</h3>
+        <p>Total Rutas</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon active">🚀</div>
+      <div class="stat-info">
+        <h3>{{ getActiveRoutesCount() }}</h3>
+        <p>En Progreso</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon optimized">⭐</div>
+      <div class="stat-info">
+        <h3>{{ getOptimizedRoutesCount() }}</h3>
+        <p>Completadas</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon revenue">💰</div>
+      <div class="stat-info">
+        <h3>{{ formatCurrency(getTotalRevenue()) }}</h3>
+        <p>Ingresos Totales</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon profit">📈</div>
+      <div class="stat-info">
+        <h3>{{ formatCurrency(getTotalProfit()) }}</h3>
+        <p>Ganancia Total</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="filters-card">
+    <div class="filters-header">
+      <h3>🔍 Filtros de Búsqueda</h3>
+      <button class="btn-clear" (click)="clearFilters()">
+        🧹 Limpiar Filtros
+      </button>
+    </div>
+    <div class="filters-grid">
+      <div class="filter-group">
+        <label class="filter-label">Estado</label>
+        <select class="filter-select" [(ngModel)]="filters.status" (change)="applyFilters()">
+          <option value="">Todos los estados</option>
+          <option *ngFor="let status of statusOptions" [value]="status">
+            {{ getStatusText(status) }}
+          </option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">Ciudad</label>
+        <select class="filter-select" [(ngModel)]="filters.city" (change)="applyFilters()">
+          <option value="">Todas las ciudades</option>
+          <option *ngFor="let city of cityOptions" [value]="city">
+            {{ city }}
+          </option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">Conductor</label>
+        <select class="filter-select" [(ngModel)]="filters.driver" (change)="applyFilters()">
+          <option value="">Todos los conductores</option>
+          <option *ngFor="let driver of driverOptions" [value]="driver">
+            {{ driver }}
+          </option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="loading-state">
+    <div class="spinner"></div>
+    <h3>Cargando datos...</h3>
+    <p>Obteniendo rutas y conductores</p>
+  </div>
+
+  <!-- Tabla de Rutas -->
+  <div *ngIf="!loading" class="table-container">
+    <div class="table-header">
+      <h3>📋 Lista de Rutas</h3>
+      <span class="results-count">{{ filteredRoutes.length }} rutas encontradas</span>
+    </div>
+
+    <div *ngIf="filteredRoutes.length === 0" class="empty-state">
+      <div class="empty-icon">🚚</div>
+      <h3>No se encontraron rutas</h3>
+      <p *ngIf="routes.length === 0">No hay rutas registradas en el sistema</p>
+      <p *ngIf="routes.length > 0">No hay rutas que coincidan con los filtros aplicados</p>
+      <button class="btn-primary" (click)="navigateToNewRoute()" *ngIf="routes.length === 0">
+        ➕ Crear Primera Ruta
+      </button>
+      <button class="btn-primary" (click)="clearFilters()" *ngIf="routes.length > 0">
+        Ver todas las rutas
+      </button>
+    </div>
+
+    <div *ngIf="filteredRoutes.length > 0" class="table-responsive">
+      <table class="routes-table">
+        <thead>
+          <tr>
+            <th class="col-name">Ruta</th>
+            <th class="col-conductor">Conductor</th>
+            <th class="col-vehicle">Vehículo</th>
+            <th class="col-city">Ciudad</th>
+            <th class="col-stops">Paradas</th>
+            <th class="col-distance">Distancia</th>
+            <th class="col-duration">Duración</th>
+            <th class="col-status">Estado</th>
+            <th class="col-profit">Ganancia</th>
+            <th class="col-actions">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let route of filteredRoutes" class="route-row">
+            <!-- Nombre Ruta -->
+            <td class="route-name">
+              <div class="name-cell">
+                <strong>{{ route.name }}</strong>
+                <small *ngIf="route.startTime && route.endTime">
+                  🕒 {{ route.startTime }} - {{ route.endTime }}
+                </small>
+              </div>
+            </td>
+
+            <!-- Conductor -->
+            <td class="driver-cell">
+              <div class="driver-wrapper">
+                <div class="driver-avatar" *ngIf="route.driver">
+                  {{ route.driver.nombre?.charAt(0) || '?' }}{{ route.driver.apellido?.charAt(0) || '' }}
+                </div>
+                <div class="driver-avatar no-driver" *ngIf="!route.driver">?</div>
+                <div class="driver-text">
+                  <span class="driver-name" *ngIf="route.driver">
+                    {{ route.driver.nombre }} {{ route.driver.apellido }}
+                  </span>
+                  <span class="driver-name no-driver" *ngIf="!route.driver">
+                    Sin asignar
+                  </span>
+                  <span class="driver-license" *ngIf="route.driver">
+                    {{ route.driver.licencia }}
+                  </span>
+                </div>
+              </div>
+            </td>
+
+            <!-- Vehículo -->
+            <td class="vehicle-cell">
+              <span class="vehicle-badge">{{ route.vehicle || 'N/A' }}</span>
+            </td>
+
+            <!-- Ciudad -->
+            <td class="city-cell">
+              <span class="city-badge">📍 {{ route.city || 'N/A' }}</span>
+            </td>
+
+            <!-- Paradas -->
+            <td class="stops-cell">
+              <span class="stops-badge">
+                <strong>{{ route.stops || 0 }}</strong>
+              </span>
+            </td>
+
+            <!-- Distancia -->
+            <td class="distance-cell">
+              <strong>{{ route.distance || 0 }} km</strong>
+            </td>
+
+            <!-- Duración -->
+            <td class="duration-cell">
+              {{ route.estimatedDuration || 'N/A' }}
+            </td>
+
+            <!-- Estado -->
+            <td class="status-cell">
+              <span class="status-badge" [ngClass]="getStatusBadgeClass(route.status)">
+                {{ getStatusIcon(route.status) }} {{ getStatusText(route.status) }}
+              </span>
+            </td>
+
+            <!-- Ganancia -->
+            <td class="profit-cell">
+              <div class="profit-wrapper">
+                <div class="profit-amount"
+                     [class.positive]="calculateProfit(route) > 0"
+                     [class.negative]="calculateProfit(route) < 0">
+                  {{ formatCurrency(calculateProfit(route)) }}
+                </div>
+                <small class="profit-percentage">
+                  {{ getProfitPercentage(route) | number:'1.0-0' }}%
+                </small>
+              </div>
+            </td>
+
+            <!-- Acciones -->
+            <td class="actions-cell">
+              <div class="action-buttons">
+                <button class="btn-action view"
+                        (click)="viewRoute(route)"
+                        title="Ver detalles">
+                  👁️
+                </button>
+                <button class="btn-action edit"
+                        (click)="editRoute(route)"
+                        title="Editar">
+                  ✏️
+                </button>
+                <button class="btn-action optimize"
+                        (click)="optimizeRoute(route)"
+                        [class.optimized]="route.status === 'COMPLETED'"
+                        [disabled]="route.status === 'COMPLETED'"
+                        title="Optimizar">
+                  ⚡
+                </button>
+                <button class="btn-action delete"
+                        (click)="deleteRoute(route)"
+                        title="Eliminar">
+                  🗑️
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

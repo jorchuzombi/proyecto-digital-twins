@@ -1,0 +1,406 @@
+<!-- vehicles-container -->
+<div class="vehicles-container">
+  <!-- Header -->
+  <div class="vehicles-header">
+    <div class="header-content">
+      <h1>
+        <span class="header-icon">🚛</span>
+        Gestión de Vehículos
+      </h1>
+      <p class="header-subtitle">Administra y controla toda la flota de vehículos</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-success" (click)="exportVehicles()" *ngIf="vehicles.length > 0">
+        <span class="btn-icon">📄</span>
+        Exportar CSV
+      </button>
+      <button class="btn-primary" (click)="newVehicle()">
+        <span class="btn-icon">➕</span>
+        Nuevo Vehículo
+      </button>
+    </div>
+  </div>
+
+  <!-- Estadísticas Rápidas -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon total">📊</div>
+      <div class="stat-info">
+        <h3>{{ vehicles.length }}</h3>
+        <p>Total Vehículos</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon active">🚀</div>
+      <div class="stat-info">
+        <h3>{{ getActiveVehiclesCount() }}</h3>
+        <p>Activos</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon maintenance">🔧</div>
+      <div class="stat-info">
+        <h3>{{ getMaintenanceVehiclesCount() }}</h3>
+        <p>En Mantenimiento</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon route">🚛</div>
+      <div class="stat-info">
+        <h3>{{ getInRouteVehiclesCount() }}</h3>
+        <p>En Ruta</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon capacity">📦</div>
+      <div class="stat-info">
+        <h3>{{ getAverageCapacity() }}</h3>
+        <p>Capacidad Promedio</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACCIONES MASIVAS -->
+  <div class="bulk-actions-card" *ngIf="getSelectedCount() > 0">
+    <div class="card-body">
+      <div class="bulk-header">
+        <div class="selected-info">
+          <span class="selected-count">{{ getSelectedCount() }} vehículo(s) seleccionado(s)</span>
+        </div>
+        <div class="bulk-buttons">
+          <div class="dropdown">
+            <button class="btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+              <span class="btn-icon">🔄</span>
+              Cambiar Estado
+            </button>
+            <ul class="dropdown-menu">
+              <li *ngFor="let status of statusOptions">
+                <a class="dropdown-item" href="#" (click)="bulkChangeStatus(status); $event.preventDefault()">
+                  {{ status }}
+                </a>
+              </li>
+            </ul>
+          </div>
+          <button class="btn-outline-danger" (click)="deleteSelectedVehicles()">
+            <span class="btn-icon">🗑️</span>
+            Eliminar Seleccionados
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros Mejorados -->
+  <div class="filters-card">
+    <div class="filters-header">
+      <h3>🔍 Filtros de Búsqueda</h3>
+      <button class="btn-clear" (click)="clearFilters()">
+        🧹 Limpiar Filtros
+      </button>
+    </div>
+    <div class="filters-grid">
+      <!-- Búsqueda General -->
+      <div class="filter-group">
+        <label class="filter-label">
+          🔎 Búsqueda General
+        </label>
+        <input
+          type="text"
+          class="filter-input"
+          [(ngModel)]="filters.search"
+          (ngModelChange)="onSearchChange($event)"
+          placeholder="Buscar por placa, marca, modelo..."
+        >
+        <small class="help-text">Busca en todos los campos</small>
+      </div>
+
+      <!-- Búsqueda Rápida por Placa -->
+      <div class="filter-group">
+        <label class="filter-label">
+          🚗 Búsqueda Rápida por Placa
+        </label>
+        <input
+          type="text"
+          class="filter-input placa-search"
+          (input)="onPlacaSearch($any($event.target).value)"
+          placeholder="Escribe la placa del vehículo..."
+          maxlength="10"
+        >
+        <small class="help-text">⚡ Búsqueda instantánea (mínimo 1 carácter)</small>
+      </div>
+
+      <!-- Estado -->
+      <div class="filter-group">
+        <label class="filter-label">
+          📊 Estado del Vehículo
+        </label>
+        <select
+          class="filter-select"
+          [(ngModel)]="filters.estado"
+          (change)="applyFilters()"
+        >
+          <option [value]="undefined">✨ Todos los estados</option>
+          <option *ngFor="let status of statusOptions" [value]="status">
+            {{ status }}
+          </option>
+        </select>
+      </div>
+
+      <!-- Tipo -->
+      <div class="filter-group">
+        <label class="filter-label">
+          🚛 Tipo de Vehículo
+        </label>
+        <select
+          class="filter-select"
+          [(ngModel)]="filters.tipo"
+          (change)="applyFilters()"
+        >
+          <option [value]="undefined">✨ Todos los tipos</option>
+          <option *ngFor="let tipo of tipoOptions" [value]="tipo">
+            {{ tipo | titlecase }}
+          </option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="loading-state">
+    <div class="spinner"></div>
+    <h3>Conectando con el servidor...</h3>
+    <p>Obteniendo datos de vehículos en tiempo real</p>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error && !loading" class="error-state">
+    <div class="error-icon">⚠️</div>
+    <h3>Error de conexión</h3>
+    <p>{{ error }}</p>
+    <button class="btn-primary" (click)="loadVehicles()">
+      <span class="btn-icon">🔄</span>
+      Reintentar
+    </button>
+  </div>
+
+  <!-- Tabla de Vehículos -->
+  <div *ngIf="!loading && !error" class="table-container">
+    <div class="table-header">
+      <h3>📋 Lista de Vehículos</h3>
+      <span class="results-count">{{ vehicles.length }} vehículos encontrados</span>
+    </div>
+
+    <div *ngIf="vehicles.length === 0" class="empty-state">
+      <div class="empty-icon">🚛</div>
+      <h3>No se encontraron vehículos</h3>
+      <p>No hay vehículos que coincidan con los filtros aplicados</p>
+      <button class="btn-primary" (click)="clearFilters()">
+        Ver todos los vehículos
+      </button>
+    </div>
+
+    <div *ngIf="vehicles.length > 0" class="table-responsive">
+      <table class="vehicles-table">
+        <thead>
+          <tr>
+            <th width="50">
+              <input type="checkbox"
+                     class="form-check-input"
+                     [checked]="selectAll"
+                     (change)="toggleSelectAll()"
+                     title="Seleccionar todos">
+            </th>
+            <th>Placa</th>
+            <th>Tipo</th>
+            <th>Marca</th>
+            <th>Modelo</th>
+            <th>Año</th>
+            <th>Capacidad</th>
+            <th>Kilometraje</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let vehicle of vehicles"
+              class="vehicle-row"
+              [class.table-active]="isVehicleSelected(vehicle.id)">
+            <td>
+              <input type="checkbox"
+                     class="form-check-input"
+                     [checked]="isVehicleSelected(vehicle.id)"
+                     (change)="toggleVehicleSelection(vehicle.id)">
+            </td>
+            <td class="vehicle-placa">
+              <strong>{{ vehicle.placa }}</strong>
+            </td>
+            <td class="vehicle-tipo">
+              <span class="tipo-badge">{{ vehicle.tipo }}</span>
+            </td>
+            <td class="vehicle-marca">
+              {{ vehicle.marca || 'N/A' }}
+            </td>
+            <td class="vehicle-modelo">
+              {{ vehicle.modelo || 'N/A' }}
+            </td>
+            <td class="vehicle-anio">
+              <span class="anio-badge">{{ vehicle.anio }}</span>
+            </td>
+            <td class="vehicle-capacidad">
+              <strong>{{ getCapacidadDisplay(vehicle) }}</strong>
+            </td>
+            <td class="vehicle-kilometraje">
+              {{ vehicle.kilometraje ? (vehicle.kilometraje + ' km') : 'N/A' }}
+            </td>
+            <td>
+              <span class="badge" [ngClass]="getStatusBadgeClass(vehicle.estado)">
+                {{ vehicle.estado }}
+              </span>
+            </td>
+            <td class="actions-cell">
+              <div class="action-buttons">
+                <button class="btn-action edit" (click)="editVehicle(vehicle)" title="Editar vehículo">
+                  ✏️
+                </button>
+                <button class="btn-action status"
+                        (click)="changeStatus(vehicle,
+                          vehicle.estado === VehicleStatus.ACTIVO ? VehicleStatus.INACTIVO : VehicleStatus.ACTIVO)"
+                        [title]="'Cambiar a ' + (vehicle.estado === VehicleStatus.ACTIVO ? 'INACTIVO' : 'ACTIVO')">
+                  🔄
+                </button>
+                <button class="btn-action delete" (click)="deleteVehicle(vehicle)" title="Eliminar vehículo">
+                  🗑️
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- MODAL FORMULARIO COMPACTO Y RESPONSIVO -->
+  <div *ngIf="showForm" class="modal-overlay" (click)="$event.target === $event.currentTarget && cancelForm()">
+    <div class="modal-container-compact">
+      <div class="form-content-compact">
+        <!-- Header Simple y Compacto -->
+        <div class="form-header-compact">
+          <h1>
+            <span class="header-icon">{{ editingVehicle ? '✏️' : '➕' }}</span>
+            {{ editingVehicle ? 'Editar Vehículo' : 'Nuevo Vehículo' }}
+          </h1>
+          <div class="header-actions-compact">
+            <button class="btn-cancel" (click)="cancelForm()">
+              ❌ Cancelar
+            </button>
+            <button
+              class="btn-save"
+              (click)="saveVehicle()"
+              [disabled]="!isFormValid()"
+            >
+              {{ editingVehicle ? '💾 Actualizar' : '✨ Crear' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Formulario Compacto -->
+        <div class="form-body-compact">
+          <div class="form-grid-compact">
+            <!-- Placa -->
+            <div class="form-field" [class.field-error]="!formData.placa?.trim()">
+              <label>Placa *</label>
+              <input
+                type="text"
+                [(ngModel)]="formData.placa"
+                (input)="onFormInputChange()"
+                [disabled]="!!editingVehicle"
+                placeholder="ABC123"
+                maxlength="10"
+              >
+            </div>
+
+            <!-- Tipo -->
+            <div class="form-field" [class.field-error]="!formData.tipo?.trim()">
+              <label>Tipo *</label>
+              <select
+                [(ngModel)]="formData.tipo"
+                (change)="onFormInputChange()"
+              >
+                <option value="">-- Selecciona --</option>
+                <option *ngFor="let tipo of tipoOptions" [value]="tipo">
+                  {{ tipo | titlecase }}
+                </option>
+              </select>
+            </div>
+
+            <!-- Marca -->
+            <div class="form-field" [class.field-error]="!formData.marca?.trim()">
+              <label>Marca *</label>
+              <input
+                type="text"
+                [(ngModel)]="formData.marca"
+                (input)="onFormInputChange()"
+                placeholder="Toyota, Chevrolet"
+              >
+            </div>
+
+            <!-- Modelo -->
+            <div class="form-field" [class.field-error]="!formData.modelo?.trim()">
+              <label>Modelo *</label>
+              <input
+                type="text"
+                [(ngModel)]="formData.modelo"
+                (input)="onFormInputChange()"
+                placeholder="Hilux, NPR"
+              >
+            </div>
+
+            <!-- Año -->
+            <div class="form-field" [class.field-error]="!(formData.anio >= 2000 && formData.anio <= getMaxYear())">
+              <label>Año *</label>
+              <input
+                type="number"
+                [(ngModel)]="formData.anio"
+                (input)="onFormInputChange()"
+                [min]="2000"
+                [max]="getMaxYear()"
+                placeholder="2024"
+              >
+            </div>
+
+            <!-- Capacidad -->
+            <div class="form-field">
+              <label>Capacidad</label>
+              <input
+                type="text"
+                [(ngModel)]="formData.capacidadCarga"
+                placeholder="1500 kg, 2.5 ton"
+              >
+            </div>
+
+            <!-- Kilometraje -->
+            <div class="form-field">
+              <label>Kilometraje (km)</label>
+              <input
+                type="number"
+                [(ngModel)]="formData.kilometraje"
+                [min]="0"
+                placeholder="0"
+              >
+            </div>
+
+            <!-- Estado (solo en edición) -->
+            <div class="form-field" *ngIf="editingVehicle">
+              <label>Estado</label>
+              <select [(ngModel)]="formData.estado">
+                <option *ngFor="let status of statusOptions" [value]="status">
+                  {{ status }}
+                </option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
