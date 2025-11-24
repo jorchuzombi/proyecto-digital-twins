@@ -1,7 +1,8 @@
+// report.service.ts - ✅ CORREGIDO SIN /api/api/
+
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable, of } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { Observable } from 'rxjs';
 
 export interface Report {
   id: string;
@@ -10,10 +11,9 @@ export interface Report {
   period: string;
   generatedDate: string;
   data: any;
-  metrics?: any;
 }
 
-export interface GenerateReportRequest {
+export interface ReportRequest {
   type: string;
   period: string;
   title: string;
@@ -23,63 +23,59 @@ export interface GenerateReportRequest {
   providedIn: 'root'
 })
 export class ReportService {
-  private apiUrl = 'http://localhost:8000/api/reports';
+  // ✅ URL base SIN /api al final
+  private apiUrl = 'http://localhost:8000/api';
 
   constructor(private http: HttpClient) {}
 
+  /**
+   * ✅ Obtener todos los reportes
+   */
   getAllReports(): Observable<Report[]> {
-    return this.http.get<Report[]>(this.apiUrl).pipe(
-      catchError(error => {
-        console.error('Error fetching reports:', error);
-        return of([]); // Retorna array vacío en caso de error
-      })
-    );
+    return this.http.get<Report[]>(`${this.apiUrl}/reports`);
   }
 
-  getReportById(id: string): Observable<Report> {
-    return this.http.get<Report>(`${this.apiUrl}/${id}`).pipe(
-      catchError(error => {
-        console.error('Error fetching report:', error);
-        throw error;
-      })
-    );
+  /**
+   * ✅ Generar nuevo reporte
+   */
+  generateReport(request: ReportRequest): Observable<Report> {
+    return this.http.post<Report>(`${this.apiUrl}/reports/generate`, request);
   }
 
-  generateReport(request: GenerateReportRequest): Observable<Report> {
-    return this.http.post<Report>(this.apiUrl, request).pipe(
-      catchError(error => {
-        console.error('Error generating report:', error);
-        throw error;
-      })
-    );
-  }
-
+  /**
+   * ✅ Descargar reporte como PDF
+   */
   downloadReport(id: string): Observable<Blob> {
-    return this.http.get(`${this.apiUrl}/${id}/download`, {
+    return this.http.get(`${this.apiUrl}/reports/${id}/download`, {
       responseType: 'blob'
-    }).pipe(
-      catchError(error => {
-        console.error('Error downloading report:', error);
-        throw error;
-      })
-    );
+    });
   }
 
-  shareReport(id: string, shareData: any): Observable<any> {
-    return this.http.post(`${this.apiUrl}/${id}/share`, shareData).pipe(
-      catchError(error => {
-        console.error('Error sharing report:', error);
-        throw error;
-      })
-    );
+  /**
+   * ✅ Compartir reporte por email
+   */
+  shareReport(id: string, email: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/reports/${id}/share`, { email });
   }
 
+  /**
+   * ✅ Eliminar reporte
+   */
   deleteReport(id: string): Observable<any> {
-    return this.http.delete(`${this.apiUrl}/${id}`).pipe(
-      catchError(error => {
-        console.error('Error deleting report:', error);
-        throw error;
-      })
-    );
+    return this.http.delete(`${this.apiUrl}/reports/${id}`);
+  }
+
+  /**
+   * ✅ Obtener reporte por ID
+   */
+  getReportById(id: string): Observable<Report> {
+    return this.http.get<Report>(`${this.apiUrl}/reports/${id}`);
+  }
+
+  /**
+   * ✅ Obtener reportes por tipo
+   */
+  getReportsByType(type: string): Observable<Report[]> {
+    return this.http.get<Report[]>(`${this.apiUrl}/reports/type/${type}`);
   }
 }

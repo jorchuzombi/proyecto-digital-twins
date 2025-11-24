@@ -1,3 +1,12 @@
+// ===== VARIABLES Y COLORES =====
+$primary-gradient: linear-gradient(135deg, #667eea, #764ba2);
+$background-dark: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+$color-available: #22c55e;
+$color-busy: #f59e0b;
+$color-offline: #6b7280;
+$color-text-light: #e2e8f0;
+$color-text-muted: #94a3b8;
+
 // src/app/features/drivers/pages/driver-form/driver-form.component.scss
 
 .form-container {

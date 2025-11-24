@@ -1,375 +1,293 @@
-// src/app/services/real-time-routing.service.ts
-import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Observable, of, throwError } from 'rxjs';
-import { map, catchError, tap } from 'rxjs/operators';
-import { environment } from '../../environments/environment';
 import * as L from 'leaflet';
+
+// src/app/services/real-time-routing.service.ts
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable, BehaviorSubject, interval, of, throwError } from 'rxjs';
+import { map, switchMap, catchError, tap, shareReplay } from 'rxjs/operators';
+import { environment } from '../../environments/environment';
 
 export interface VehiclePosition {
   vehicleId: string;
-  vehicleName: string;
-  lat: number;
-  lng: number;
-  latitude: number; // Alias for lat
-  longitude: number; // Alias for lng
+  driverId: string;
+  driverName: string;
+  latitude: number;
+  longitude: number;
   speed: number;
+  heading: number;
   status: 'AVAILABLE' | 'BUSY' | 'OFFLINE';
   lastUpdate: Date;
-  heading?: number; // Dirección en grados (0-360)
-  eta?: number; // Tiempo estimado de llegada en minutos
-  distance?: number; // Distancia restante en km
-  driverName: string;
+  currentRouteId?: string;
+  nextStop?: string;
+  eta?: string;
   distanceToDestination?: number;
-}
-
-export interface RouteResponse {
-  coordinates: [number, number][];
-  distance: number;
-  duration: number;
+  trafficLevel?: 'LOW' | 'MEDIUM' | 'HIGH' | 'HEAVY';
+  vehicleType?: string;
 }
 
 export interface OptimizedRoute {
-  geometry: L.LatLng[];
+  id: string;
+  vehicleId: string;
+  driverId: string;
+  waypoints: L.LatLng[];
   distance: number;
   duration: number;
+  optimizedOrder: number[];
+}
+
+export interface RouteStop {
+  latitude: number;
+  longitude: number;
+  address?: string;
+  order?: number;
 }
 
 @Injectable({
   providedIn: 'root'
 })
 export class RealTimeRoutingService {
-  private http = inject(HttpClient);
+  private apiUrl = `${environment.apiUrl}/tracking`;
+  private vehiclePositionsSubject = new BehaviorSubject<Map<string, VehiclePosition>>(new Map());
+  public vehiclePositions$ = this.vehiclePositionsSubject.asObservable();
+  private activeRoutes = new Map<string, OptimizedRoute>();
 
-  // API URLs
-  private readonly API_URL = 'http://localhost:8000/api';
-  private readonly OSRM_API = 'https://router.project-osrm.org/route/v1/driving';
-
-  constructor() {
+  constructor(private http: HttpClient) {
     console.log('🚀 RealTimeRoutingService inicializado');
-    console.log('📡 API URL:', this.API_URL);
+    console.log('📍 API URL:', this.apiUrl);
+    this.startPositionPolling();
   }
 
   /**
-   * Obtener todas las posiciones de vehículos
+   * Asigna una ruta a un vehículo
    */
-  getAllVehiclePositions(): Observable<VehiclePosition[]> {
-    const url = `${this.API_URL}/vehicles/positions`;
-    console.log('📍 Solicitando posiciones:', url);
+  assignRouteToVehicle(
+    routeId: string,
+    vehicleId: string,
+    driverId: string,
+    stops: RouteStop[]
+  ): Observable<OptimizedRoute> {
+    console.log('🔧 assignRouteToVehicle - LLAMADA AL SERVICIO');
+    console.log('📦 Parámetros recibidos:', { routeId, vehicleId, driverId, stops: stops?.length || 0 });
 
-    return this.http.get<VehiclePosition[]>(url).pipe(
-      tap(positions => {
-        console.log(`✅ ${positions.length} posiciones recibidas`);
+    if (!routeId) {
+      console.error('❌ routeId es undefined o vacío');
+      return throwError(() => new Error('routeId es requerido'));
+    }
+    if (!vehicleId) {
+      console.error('❌ vehicleId es undefined o vacío');
+      return throwError(() => new Error('vehicleId es requerido'));
+    }
+    if (!driverId) {
+      console.error('❌ driverId es undefined o vacío');
+      return throwError(() => new Error('driverId es requerido'));
+    }
+    if (!stops || stops.length === 0) {
+      console.error('❌ stops está vacío o undefined');
+      return throwError(() => new Error('stops es requerido'));
+    }
+
+    const url = `${this.apiUrl}/assign-route`;
+    const payload = { routeId, vehicleId, driverId, stops };
+
+    console.log('📤 Enviando POST a:', url);
+    console.log('📦 Payload:', JSON.stringify(payload, null, 2));
+
+    return this.http.post<any>(url, payload).pipe(
+      tap(response => console.log('✅ Respuesta recibida:', response)),
+      map(response => {
+        const optimizedRoute: OptimizedRoute = {
+          id: routeId,
+          vehicleId: vehicleId,
+          driverId: driverId,
+          waypoints: stops.map(stop => L.latLng(stop.latitude, stop.longitude)),
+          distance: response.distance || 0,
+          duration: response.duration || 0,
+          optimizedOrder: response.optimizedOrder || stops.map((_, i) => i)
+        };
+        this.activeRoutes.set(routeId, optimizedRoute);
+        console.log(`✅ Ruta ${routeId} guardada en caché local`);
+        return optimizedRoute;
       }),
-      map(positions => positions.map(pos => ({
-        ...pos,
-        lastUpdate: new Date(pos.lastUpdate),
-        latitude: pos.lat, // Alias
-        longitude: pos.lng, // Alias
-        driverName: pos.vehicleName, // Alias for now
-        distanceToDestination: pos.distance
-      }))),
-      catchError((error: HttpErrorResponse) => {
-        console.error('❌ Error obteniendo posiciones:', error);
-
-        // Si el backend no está disponible, usar datos simulados
-        if (error.status === 0 || error.status === 404) {
-          console.warn('⚠️ Backend no disponible, usando datos simulados');
-          return of(this.getSimulatedPositions());
-        }
-
-        return throwError(() => error);
+      catchError(error => {
+        console.error('❌ Error en assignRouteToVehicle:', error);
+        throw error;
       })
     );
   }
 
   /**
-   * Alias for getAllVehiclePositions (used in dashboard)
+   * Inicia una ruta
+   */
+  startRoute(routeId: string): Observable<boolean> {
+    console.log(`🚀 startRoute - Iniciando ruta ${routeId}`);
+    if (!routeId) {
+      console.error('❌ routeId es undefined');
+      return of(false);
+    }
+    const url = `${environment.apiUrl}/routes/${routeId}/start`;
+    console.log('📤 POST a:', url);
+    return this.http.post<any>(url, {}).pipe(
+      tap(response => console.log('✅ Ruta iniciada, respuesta:', response)),
+      map(response => response.success !== false),
+      catchError(error => {
+        console.error('❌ Error iniciando ruta:', error);
+        return of(false);
+      })
+    );
+  }
+
+  /**
+   * Completa una ruta
+   */
+  completeRoute(routeId: string): Observable<boolean> {
+    console.log(`✅ completeRoute - Completando ruta ${routeId}`);
+    if (!routeId) {
+      console.error('❌ routeId es undefined');
+      return of(false);
+    }
+    const url = `${environment.apiUrl}/routes/${routeId}/complete`;
+    console.log('📤 POST a:', url);
+    return this.http.post<any>(url, {}).pipe(
+      tap(response => console.log('✅ Ruta completada, respuesta:', response)),
+      map(response => response.success !== false),
+      catchError(error => {
+        console.error('❌ Error completando ruta:', error);
+        return of(false);
+      })
+    );
+  }
+
+  /**
+   * Obtiene las posiciones de todos los vehículos
    */
   getVehiclePositions(): Observable<Map<string, VehiclePosition>> {
-    return this.getAllVehiclePositions().pipe(
+    return this.http.get<any[]>(`${this.apiUrl}/positions`).pipe(
       map(positions => {
-        const positionMap = new Map<string, VehiclePosition>();
+        const positionsMap = new Map<string, VehiclePosition>();
         positions.forEach(pos => {
-          positionMap.set(pos.vehicleId, pos);
+          const vehiclePosition: VehiclePosition = {
+            vehicleId: pos.vehicleId || pos.id,
+            driverId: pos.driverId || `driver-${pos.vehicleId}`,
+            driverName: pos.driverName || 'Conductor',
+            latitude: pos.latitude,
+            longitude: pos.longitude,
+            speed: pos.speed || 0,
+            heading: pos.heading || 0,
+            status: pos.status || 'OFFLINE',
+            lastUpdate: new Date(pos.lastUpdate || Date.now()),
+            currentRouteId: pos.currentRouteId,
+            nextStop: pos.nextStop,
+            eta: pos.eta,
+            distanceToDestination: pos.distanceToDestination,
+            trafficLevel: pos.trafficLevel,
+            vehicleType: pos.vehicleType
+          };
+          positionsMap.set(vehiclePosition.vehicleId, vehiclePosition);
         });
-        return positionMap;
+        this.vehiclePositionsSubject.next(positionsMap);
+        return positionsMap;
+      }),
+      catchError(error => {
+        console.error('❌ Error obteniendo posiciones:', error);
+        return of(new Map<string, VehiclePosition>());
+      }),
+      shareReplay(1)
+    );
+  }
+
+  /**
+   * Obtiene solo las posiciones activas
+   */
+  getActivePositions(): Observable<Map<string, VehiclePosition>> {
+    return this.http.get<any[]>(`${this.apiUrl}/positions/active`).pipe(
+      map(positions => {
+        const positionsMap = new Map<string, VehiclePosition>();
+        positions.forEach(pos => {
+          const vehiclePosition: VehiclePosition = {
+            vehicleId: pos.vehicleId || pos.id,
+            driverId: pos.driverId || `driver-${pos.vehicleId}`,
+            driverName: pos.driverName || 'Conductor',
+            latitude: pos.latitude,
+            longitude: pos.longitude,
+            speed: pos.speed || 0,
+            heading: pos.heading || 0,
+            status: pos.status || 'OFFLINE',
+            lastUpdate: new Date(pos.lastUpdate || Date.now()),
+            currentRouteId: pos.currentRouteId,
+            nextStop: pos.nextStop,
+            eta: pos.eta,
+            distanceToDestination: pos.distanceToDestination,
+            trafficLevel: pos.trafficLevel,
+            vehicleType: pos.vehicleType
+          };
+          positionsMap.set(vehiclePosition.vehicleId, vehiclePosition);
+        });
+        return positionsMap;
+      }),
+      catchError(error => {
+        console.error('❌ Error obteniendo posiciones activas:', error);
+        return of(new Map<string, VehiclePosition>());
       })
     );
   }
 
   /**
-   * Obtener posición de un vehículo específico
+   * Obtiene el progreso de una ruta
    */
-  getVehiclePosition(vehicleId: string): Observable<VehiclePosition | null> {
-    return this.getAllVehiclePositions().pipe(
-      map(positions => positions.find(p => p.vehicleId === vehicleId) || null),
+  getRouteProgress(routeId: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/progress/${routeId}`).pipe(
       catchError(error => {
-        console.error('Error obteniendo posición del vehículo:', error);
+        console.error(`❌ Error obteniendo progreso de ruta ${routeId}:`, error);
         return of(null);
       })
     );
   }
 
   /**
-   * Calcular ruta entre dos puntos usando OSRM
+   * Health check del servicio de tracking
    */
-  calculateRoute(
-    startLat: number,
-    startLng: number,
-    endLat: number,
-    endLng: number
-  ): Observable<RouteResponse> {
-    const url = `${this.OSRM_API}/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`;
-
-    return this.http.get<any>(url).pipe(
-      map(response => {
-        if (response.code === 'Ok' && response.routes.length > 0) {
-          const route = response.routes[0];
-          return {
-            coordinates: route.geometry.coordinates.map((coord: number[]) =>
-              [coord[1], coord[0]] as [number, number]
-            ),
-            distance: route.distance / 1000, // Convertir a kilómetros
-            duration: route.duration / 60 // Convertir a minutos
-          };
-        }
-        throw new Error('No se pudo calcular la ruta');
-      }),
+  healthCheck(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/health`).pipe(
+      tap(response => console.log('✅ Health check:', response)),
       catchError(error => {
-        console.error('Error calculando ruta con OSRM:', error);
-        // Retornar ruta directa como fallback
-        return of({
-          coordinates: [[startLat, startLng], [endLat, endLng]] as [number, number][],
-          distance: this.calculateDistance(startLat, startLng, endLat, endLng),
-          duration: 30 // Estimación por defecto
-        });
+        console.error('❌ Health check falló:', error);
+        return of({ status: 'error' });
       })
     );
   }
 
   /**
-   * Calcular distancia entre dos puntos (fórmula de Haversine)
+   * Inicia el polling automático de posiciones cada 5 segundos
    */
-  private calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
-    const R = 6371; // Radio de la Tierra en km
-    const dLat = this.toRadians(lat2 - lat1);
-    const dLng = this.toRadians(lng2 - lng1);
-
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(this.toRadians(lat1)) * Math.cos(this.toRadians(lat2)) *
-              Math.sin(dLng / 2) * Math.sin(dLng / 2);
-
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  }
-
-  private toRadians(degrees: number): number {
-    return degrees * (Math.PI / 180);
+  private startPositionPolling() {
+    console.log('📡 Iniciando polling de posiciones cada 5 segundos...');
+    interval(5000).pipe(
+      switchMap(() => this.getVehiclePositions())
+    ).subscribe({
+      next: (positions) => console.log(`🔄 Polling: ${positions.size} vehículos actualizados`),
+      error: (error) => console.error('❌ Error en polling:', error)
+    });
   }
 
   /**
-   * Calcular dirección (heading) entre dos puntos
+   * Obtiene una ruta por ID desde el caché local
    */
-  calculateHeading(lat1: number, lng1: number, lat2: number, lng2: number): number {
-    const dLng = this.toRadians(lng2 - lng1);
-    const lat1Rad = this.toRadians(lat1);
-    const lat2Rad = this.toRadians(lat2);
-
-    const y = Math.sin(dLng) * Math.cos(lat2Rad);
-    const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) -
-              Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLng);
-
-    let heading = Math.atan2(y, x);
-    heading = heading * (180 / Math.PI);
-    heading = (heading + 360) % 360;
-
-    return heading;
+  getRouteById(routeId: string): OptimizedRoute | undefined {
+    return this.activeRoutes.get(routeId);
   }
 
   /**
-   * Datos simulados para pruebas (cuando el backend no está disponible)
+   * Limpia todas las rutas del caché
    */
-  private getSimulatedPositions(): VehiclePosition[] {
-    const bogotaCenter = { lat: 4.6097, lng: -74.0817 };
-
-    return [
-      {
-        vehicleId: 'vehicle-001',
-        vehicleName: 'Vehículo Norte',
-        lat: bogotaCenter.lat + 0.05,
-        lng: bogotaCenter.lng,
-        latitude: bogotaCenter.lat + 0.05,
-        longitude: bogotaCenter.lng,
-        speed: 45,
-        status: 'BUSY',
-        lastUpdate: new Date(),
-        heading: 180,
-        eta: 15,
-        distance: 12.5,
-        driverName: 'Juan Pérez',
-        distanceToDestination: 12.5
-      },
-      {
-        vehicleId: 'vehicle-002',
-        vehicleName: 'Vehículo Sur',
-        lat: bogotaCenter.lat - 0.03,
-        lng: bogotaCenter.lng - 0.02,
-        latitude: bogotaCenter.lat - 0.03,
-        longitude: bogotaCenter.lng - 0.02,
-        speed: 35,
-        status: 'BUSY',
-        lastUpdate: new Date(),
-        heading: 90,
-        eta: 25,
-        distance: 18.3,
-        driverName: 'María García',
-        distanceToDestination: 18.3
-      },
-      {
-        vehicleId: 'vehicle-003',
-        vehicleName: 'Vehículo Centro',
-        lat: bogotaCenter.lat,
-        lng: bogotaCenter.lng + 0.01,
-        latitude: bogotaCenter.lat,
-        longitude: bogotaCenter.lng + 0.01,
-        speed: 0,
-        status: 'AVAILABLE',
-        lastUpdate: new Date(),
-        heading: 0,
-        eta: 0,
-        distance: 0,
-        driverName: 'Carlos Rodríguez',
-        distanceToDestination: 0
-      }
-    ];
+  clearRoutes() {
+    this.activeRoutes.clear();
+    console.log('🧹 Caché de rutas limpiado');
   }
 
   /**
-   * Calcular ruta optimizada multi-parada
+   * Obtiene todas las rutas activas
    */
-  calculateOptimizedMultiRoute(waypoints: L.LatLng[]): Observable<OptimizedRoute> {
-    if (waypoints.length < 2) {
-      return of({
-        geometry: [],
-        distance: 0,
-        duration: 0
-      });
-    }
-
-    // Para simplificar, calcular ruta punto a punto
-    const routePromises: Observable<RouteResponse>[] = [];
-    for (let i = 0; i < waypoints.length - 1; i++) {
-      const start = waypoints[i];
-      const end = waypoints[i + 1];
-      routePromises.push(
-        this.calculateRoute(start.lat, start.lng, end.lat, end.lng)
-      );
-    }
-
-    return of(...routePromises).pipe(
-      map(responses => {
-        const allCoordinates: L.LatLng[] = [];
-        let totalDistance = 0;
-        let totalDuration = 0;
-
-        responses.forEach(response => {
-          response.coordinates.forEach(coord => {
-            allCoordinates.push(L.latLng(coord[0], coord[1]));
-          });
-          totalDistance += response.distance;
-          totalDuration += response.duration;
-        });
-
-        return {
-          geometry: allCoordinates,
-          distance: totalDistance,
-          duration: totalDuration
-        };
-      }),
-      catchError(error => {
-        console.error('Error calculating optimized multi-route:', error);
-        // Fallback: ruta directa
-        return of({
-          geometry: waypoints,
-          distance: this.calculateDistance(
-            waypoints[0].lat, waypoints[0].lng,
-            waypoints[waypoints.length - 1].lat, waypoints[waypoints.length - 1].lng
-          ),
-          duration: 30
-        });
-      })
-    );
-  }
-
-  /**
-   * Simular actualización de posición (para pruebas)
-   */
-  simulatePositionUpdate(
-    currentPosition: VehiclePosition,
-    targetLat: number,
-    targetLng: number,
-    speed: number = 40
-  ): VehiclePosition {
-    // Calcular siguiente posición basada en velocidad
-    const distance = this.calculateDistance(
-      currentPosition.lat,
-      currentPosition.lng,
-      targetLat,
-      targetLng
-    );
-
-    // Movimiento en km (speed en km/h, intervalo de actualización en segundos)
-    const moveDistance = (speed / 3600) * 2; // 2 segundos de intervalo
-
-    if (distance <= moveDistance) {
-      // Ya llegó al destino
-      return {
-        ...currentPosition,
-        lat: targetLat,
-        lng: targetLng,
-        latitude: targetLat,
-        longitude: targetLng,
-        speed: 0,
-        status: 'AVAILABLE',
-        lastUpdate: new Date(),
-        heading: currentPosition.heading || 0,
-        eta: 0,
-        distance: 0,
-        distanceToDestination: 0
-      };
-    }
-
-    // Calcular nueva posición
-    const ratio = moveDistance / distance;
-    const newLat = currentPosition.lat + (targetLat - currentPosition.lat) * ratio;
-    const newLng = currentPosition.lng + (targetLng - currentPosition.lng) * ratio;
-
-    // Calcular heading
-    const heading = this.calculateHeading(
-      currentPosition.lat,
-      currentPosition.lng,
-      newLat,
-      newLng
-    );
-
-    // Calcular ETA y distancia restante
-    const remainingDistance = distance - moveDistance;
-    const eta = Math.ceil((remainingDistance / speed) * 60); // En minutos
-
-    return {
-      ...currentPosition,
-      lat: newLat,
-      lng: newLng,
-      latitude: newLat,
-      longitude: newLng,
-      speed: speed,
-      status: 'BUSY',
-      lastUpdate: new Date(),
-      heading: heading,
-      eta: eta,
-      distance: remainingDistance,
-      distanceToDestination: remainingDistance
-    };
+  getActiveRoutes(): OptimizedRoute[] {
+    return Array.from(this.activeRoutes.values());
   }
 }

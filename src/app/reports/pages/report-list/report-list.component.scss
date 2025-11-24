@@ -37,7 +37,7 @@ $shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   border: 1px solid $border;
 }
 
-// ===== BASE STYLES =====
+// ===== BASE =====
 .reports-container {
   padding: 2rem;
   background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
@@ -45,7 +45,7 @@ $shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-// ===== HEADER SECTION =====
+// ===== HEADER =====
 .reports-header {
   @include flex-between;
   align-items: flex-start;
@@ -102,7 +102,7 @@ $shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   }
 }
 
-// ===== STATS SECTION =====
+// ===== STATS =====
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -156,7 +156,7 @@ $shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   }
 }
 
-// ===== FILTERS SECTION =====
+// ===== FILTERS =====
 .filters-card {
   @include card-style;
   margin-bottom: 2rem;
@@ -224,7 +224,7 @@ $shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   }
 }
 
-// ===== LOADING STATE =====
+// ===== LOADING =====
 .loading-state {
   text-align: center;
   padding: 4rem 2rem;
@@ -300,7 +300,6 @@ $shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
       &.view {
         background: rgba(59, 130, 246, 0.1);
         color: $primary;
-
         &:hover {
           background: $primary;
           color: white;
@@ -311,7 +310,6 @@ $shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
       &.download {
         background: rgba(16, 185, 129, 0.1);
         color: $success;
-
         &:hover {
           background: $success;
           color: white;
@@ -322,9 +320,18 @@ $shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
       &.share {
         background: rgba(139, 92, 246, 0.1);
         color: $info;
-
         &:hover {
           background: $info;
+          color: white;
+          transform: scale(1.1);
+        }
+      }
+
+      &.delete {
+        background: rgba(239, 68, 68, 0.1);
+        color: $danger;
+        &:hover {
+          background: $danger;
           color: white;
           transform: scale(1.1);
         }
@@ -489,7 +496,7 @@ $shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   100% { transform: rotate(360deg); }
 }
 
-// ===== RESPONSIVE DESIGN =====
+// ===== RESPONSIVE =====
 @media (max-width: 768px) {
   .reports-container {
     padding: 1rem;

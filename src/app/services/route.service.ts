@@ -1,8 +1,9 @@
-// src/app/services/route.service.ts - CORREGIDO PARA TU BACKEND
+// src/app/services/route.service.ts - COMPLETO Y CORREGIDO
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpErrorResponse } from '@angular/common/http';
 import { Observable, of, throwError } from 'rxjs';
 import { catchError, timeout, retry, map, tap } from 'rxjs/operators';
+import { environment } from '../../environments/environment'; // ✅ IMPORT AÑADIDO
 
 export interface Route {
   id: string;
@@ -26,8 +27,8 @@ export interface Route {
   providedIn: 'root'
 })
 export class RouteService {
-  // ✅ URLS CORRECTAS - PUERTO 8000 CON CONTEXTO /api
- private readonly BASE_URL = 'http://localhost:8000/api';
+  // ✅ USA environment EN VEZ DE HARDCODEAR
+  private readonly BASE_URL = environment.apiUrl;
   private readonly ROUTES_URL = `${this.BASE_URL}/routes`;
   private readonly DRIVERS_URL = `${this.BASE_URL}/drivers`;
   private readonly VEHICLES_URL = `${this.BASE_URL}/vehicles`;

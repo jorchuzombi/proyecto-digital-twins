@@ -1,3 +1,4 @@
+<!-- src/app/components/dashboard/dashboard.component.html -->
 <div class="dashboard-container">
   <!-- Indicador de Tiempo Real -->
   <div class="realtime-indicator" [class.disconnected]="!apiConnected">
@@ -15,7 +16,6 @@
 
   <!-- Main Dashboard -->
   <div *ngIf="!isLoading" class="dashboard-content">
-
     <!-- Header -->
     <header class="dashboard-header">
       <div class="header-left">
@@ -28,19 +28,18 @@
           <a class="nav-link" (click)="navigateTo('vehicles')">Vehículos</a>
           <a class="nav-link" (click)="navigateTo('drivers')">Conductores</a>
           <a class="nav-link" (click)="navigateTo('routes')">Rutas</a>
+          <a class="nav-link" (click)="navigateTo('reports')">📊 Reportes</a>
         </nav>
       </div>
-
       <div class="header-right">
         <div class="user-info">
           <div class="user-avatar">
-            {{ currentUser?.username?.charAt(0)?.toUpperCase() }}
+            {{ getFirstLetter(currentUser?.username) }}
           </div>
           <span class="user-name">{{ currentUser?.username }}</span>
         </div>
         <button class="logout-btn" (click)="logout()">
-          <span>🚪</span>
-          Salir
+          <span>🚪</span> Salir
         </button>
       </div>
     </header>
@@ -48,7 +47,7 @@
     <!-- Stats Cards EN TIEMPO REAL -->
     <section class="stats-section">
       <div class="stats-grid">
-        <div class="stat-card" [class.updating]="vehiclePositions.size > 0">
+        <div class="stat-card">
           <div class="stat-icon" style="background: #667eea;">🚗</div>
           <div class="stat-info">
             <h3>{{ vehiclePositions.size }}</h3>
@@ -60,18 +59,16 @@
         <div class="stat-card">
           <div class="stat-icon" style="background: #22c55e;">✅</div>
           <div class="stat-info">
-            <h3>{{ stats.availableDrivers }}</h3>
+            <h3>{{ availableDrivers.length }}</h3>
             <p>Conductores Disponibles</p>
           </div>
-          <div class="stat-trend positive">
-            {{ stats.availableDrivers > 0 ? '+' + stats.availableDrivers : '0' }}
-          </div>
+          <div class="stat-trend positive">Sin rutas</div>
         </div>
 
         <div class="stat-card">
           <div class="stat-icon" style="background: #f59e0b;">🚚</div>
           <div class="stat-info">
-            <h3>{{ stats.activeDrivers }}</h3>
+            <h3>{{ driversInRoute.length }}</h3>
             <p>Conductores en Ruta</p>
           </div>
           <div class="stat-trend positive">Activos</div>
@@ -87,165 +84,314 @@
         </div>
 
         <div class="stat-card">
-          <div class="stat-icon" style="background: #2ed573;">💰</div>
+          <div class="stat-icon" style="background: #2ed573;">👥</div>
           <div class="stat-info">
-            <h3>{{ stats.savings }}%</h3>
-            <p>Optimización</p>
+            <h3>{{ stats.drivers }}</h3>
+            <p>Total Conductores</p>
           </div>
-          <div class="stat-trend positive">+12%</div>
+          <div class="stat-trend positive">Registrados</div>
         </div>
       </div>
     </section>
 
     <!-- Main Content -->
     <section class="main-content">
-      <!-- Mapa con Overlay -->
-      <div class="map-container">
+      <!-- Mapa -->
+      <div class="map-container-large">
         <div class="map-header">
-          <h3>🗺️ Mapa en Tiempo Real</h3>
+          <h3>🗺️ Rastreo en Tiempo Real</h3>
           <div class="map-controls">
-            <button class="control-btn" (click)="refreshData()">
+            <button class="control-btn" (click)="refreshUnifiedData()">
               🔄 Actualizar
             </button>
             <button class="control-btn" (click)="centerMap()">
               📍 Centrar
+            </button>
+            <button class="control-btn" (click)="showActiveRoutesOnMap()">
+              🛣️ Rutas
+            </button>
+            <button class="control-btn" (click)="showSystemStatus()">
+              📊 Estado
             </button>
             <select class="control-btn" [(ngModel)]="selectedCity" (change)="centerMap()">
               <option *ngFor="let city of availableCities" [value]="city.id">
                 {{ city.name }}
               </option>
             </select>
+            <input
+              type="text"
+              class="control-btn"
+              placeholder="🔍 Buscar vehículo..."
+              (keyup.enter)="searchVehicle($any($event.target).value)"
+              style="min-width: 150px;">
           </div>
         </div>
 
-        <!-- Loading del Mapa -->
         <div *ngIf="mapLoading" class="map-loading">
           <div class="spinner-small"></div>
           <span>Cargando mapa...</span>
         </div>
 
-        <!-- Mapa Interactivo -->
-        <div id="map" class="map" [class.hidden]="mapLoading"></div>
+        <div id="map" class="map-large" [class.hidden]="mapLoading"></div>
 
-        <!-- Overlay con Estadísticas -->
-        <div class="map-overlay" *ngIf="mapInitialized && !mapLoading">
-          <h4>📊 Estadísticas en Vivo</h4>
-          <div class="overlay-stats">
-            <div class="stat-row">
-              <span class="stat-label">🚗 Vehículos:</span>
-              <span class="stat-value">{{ vehiclePositions.size }}</span>
+        <!-- Panel de Estadísticas del Mapa -->
+        <div class="map-stats-panel" *ngIf="mapInitialized && !mapLoading">
+          <h4>📊 Métricas en Vivo</h4>
+          <div class="stats-grid-mini">
+            <div class="mini-stat">
+              <span class="mini-icon">🚗</span>
+              <div class="mini-info">
+                <strong>{{ vehiclePositions.size }}</strong>
+                <small>Vehículos</small>
+              </div>
             </div>
-            <div class="stat-row">
-              <span class="stat-label">✅ Disponibles:</span>
-              <span class="stat-value">{{ stats.availableDrivers }}</span>
+            <div class="mini-stat">
+              <span class="mini-icon">✅</span>
+              <div class="mini-info">
+                <strong>{{ availableDrivers.length }}</strong>
+                <small>Disponibles</small>
+              </div>
             </div>
-            <div class="stat-row">
-              <span class="stat-label">🚚 En ruta:</span>
-              <span class="stat-value">{{ stats.activeDrivers }}</span>
+            <div class="mini-stat">
+              <span class="mini-icon">🚚</span>
+              <div class="mini-info">
+                <strong>{{ driversInRoute.length }}</strong>
+                <small>En Ruta</small>
+              </div>
             </div>
-            <div class="stat-row">
-              <span class="stat-label">📍 Rutas activas:</span>
-              <span class="stat-value">{{ activeRoutes.length }}</span>
+            <div class="mini-stat">
+              <span class="mini-icon">📍</span>
+              <div class="mini-info">
+                <strong>{{ activeRoutes.length }}</strong>
+                <small>Rutas</small>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Sidebar - Conductores y Rutas -->
-      <div class="sidebar">
+      <!-- Sidebar Unificado -->
+      <div class="sidebar-routes">
 
-        <!-- Conductores EN TIEMPO REAL -->
-        <div class="sidebar-section">
+        <!-- ========================================= -->
+        <!-- CONDUCTORES EN RUTA (DESDE RUTAS REALES) -->
+        <!-- ========================================= -->
+        <div class="sidebar-section active-drivers">
           <div class="section-header">
-            <h4>👥 Conductores (Tiempo Real)</h4>
-            <button class="add-btn" (click)="navigateTo('drivers/new')" title="Agregar Conductor">
-              +
-            </button>
+            <h4>🚚 Conductores en Ruta</h4>
+            <span class="badge-count busy">{{ driversInRoute.length }}</span>
           </div>
 
-          <div class="drivers-list">
-            <div *ngFor="let position of vehiclePositions | keyvalue"
-                 class="driver-item"
-                 [class.available]="position.value.status === 'AVAILABLE'"
-                 [class.busy]="position.value.status === 'BUSY'"
-                 [class.offline]="position.value.status === 'OFFLINE'">
-
-              <div class="driver-avatar">
-                {{ position.value.driverName.charAt(0) }}{{ position.value.driverName.charAt(position.value.driverName.indexOf(' ') + 1) }}
-              </div>
-
-              <div class="driver-info">
-                <p class="driver-name">{{ position.value.driverName }}</p>
-                <div class="driver-details">
-                  <span class="driver-status-badge" [ngClass]="position.value.status.toLowerCase()">
-                    {{ getStatusIcon(position.value.status) }} {{ getStatusText(position.value.status) }}
-                  </span>
-                  <span class="driver-speed" *ngIf="position.value.speed > 0">
-                    🏃 {{ position.value.speed.toFixed(0) }} km/h
-                  </span>
-                  <span class="driver-eta" *ngIf="position.value.eta">
-                    ⏱️ {{ position.value.eta }}
-                  </span>
+          <div class="drivers-list-active">
+            <div *ngFor="let driver of driversInRoute" class="driver-card-unified busy">
+              <div class="driver-header">
+                <div class="driver-avatar-large">
+                  {{ getInitials(driver.name) }}
                 </div>
-                <small class="driver-update">
-                  Actualizado {{ getTimeAgo(position.value.lastUpdate) }}
-                </small>
+                <div class="driver-info-main">
+                  <p class="driver-name">{{ driver.name }}</p>
+                  <span class="driver-status busy">🚚 En Ruta</span>
+                </div>
               </div>
+
+              <!-- Información de Ruta -->
+              <div class="route-info-box">
+                <div class="route-detail">
+                  <span class="detail-icon">📦</span>
+                  <span class="detail-text" style="cursor: pointer; text-decoration: underline;" (click)="viewRouteDetails(driver.routeId)">{{ driver.routeName }}</span>
+                </div>
+                <div class="route-progress">
+                  <span class="progress-text">{{ driver.completedStops }}/{{ driver.stops }} paradas</span>
+                </div>
+              </div>
+
+              <!-- Métricas en Tiempo Real -->
+              <div class="driver-metrics-grid">
+                <div class="metric-item">
+                  <span class="metric-icon">🏃</span>
+                  <div class="metric-value">
+                    <strong>{{ driver.speed | number:'1.0-0' }}</strong>
+                    <small>km/h</small>
+                  </div>
+                </div>
+
+                <div class="metric-item" *ngIf="driver.trafficLevel">
+                  <span class="metric-icon">{{ getTrafficIcon(driver.trafficLevel) }}</span>
+                  <div class="metric-value">
+                    <strong>{{ driver.trafficLevel }}</strong>
+                    <small>Tráfico</small>
+                  </div>
+                </div>
+
+                <div class="metric-item" *ngIf="driver.eta">
+                  <span class="metric-icon">⏱️</span>
+                  <div class="metric-value">
+                    <strong>{{ driver.eta }}</strong>
+                    <small>ETA</small>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Última Actualización -->
+              <div class="last-update-text">
+                Actualizado {{ getTimeAgo(driver.lastUpdate) }}
+              </div>
+
+              <!-- Acciones -->
+              <div class="driver-actions-buttons">
+                <button
+                  class="action-btn-small primary"
+                  (click)="completeRouteManually({id: driver.routeId, name: driver.routeName, driverId: driver.id})">
+                  ✅ Completar
+                </button>
+                <button
+                  class="action-btn-small"
+                  (click)="centerMapOnVehicle(driver.vehicle)">
+                  📍 Ubicación
+                </button>
+                <button
+                  class="action-btn-small"
+                  (click)="viewVehicleDetails(driver.vehicle)">
+                  👁️ Detalles
+                </button>
+              </div>
+            </div>
+
+            <!-- Estado Vacío -->
+            <div *ngIf="driversInRoute.length === 0" class="empty-state-card">
+              <div class="empty-icon">🚗</div>
+              <p class="empty-title">No hay conductores en ruta</p>
+              <small class="empty-subtitle">Las rutas activas aparecerán aquí</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========================================= -->
+        <!-- CONDUCTORES DISPONIBLES (SIN RUTAS) -->
+        <!-- ========================================= -->
+        <div class="sidebar-section available-drivers">
+          <div class="section-header">
+            <h4>✅ Conductores Disponibles</h4>
+            <span class="badge-count available">{{ availableDrivers.length }}</span>
+          </div>
+
+          <div class="drivers-list-available">
+            <div *ngFor="let driver of availableDrivers" class="driver-card-simple">
+              <div class="driver-avatar-small available">
+                {{ getInitials(driver.name) }}
+              </div>
+              <div class="driver-info-simple">
+                <p class="driver-name-simple">{{ driver.name }}</p>
+                <span class="driver-status-simple available">✅ Disponible</span>
+                <small class="driver-extra" *ngIf="driver.phone">📱 {{ driver.phone }}</small>
+              </div>
+              <button
+                class="assign-btn"
+                (click)="navigateTo('routes/create?driver=' + driver.id)"
+                title="Asignar ruta">
+                📦
+              </button>
+            </div>
+
+            <!-- Estado Vacío -->
+            <div *ngIf="availableDrivers.length === 0" class="empty-state-card warning">
+              <div class="empty-icon">⚠️</div>
+              <p class="empty-title">No hay conductores disponibles</p>
+              <small class="empty-subtitle">Todos están en ruta</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========================================= -->
+        <!-- ESTADO DEL TRÁFICO -->
+        <!-- ========================================= -->
+        <div class="sidebar-section traffic-section" *ngIf="driversInRoute.length > 0">
+          <div class="section-header">
+            <h4>🚦 Estado del Tráfico</h4>
+          </div>
+
+          <div class="traffic-list">
+            <div *ngFor="let driver of driversInRoute" class="traffic-item-card">
+              <span class="traffic-driver-name">{{ driver.name }}</span>
+              <span
+                class="traffic-badge-status"
+                [style.background]="getTrafficColor(driver.trafficLevel)">
+                {{ getTrafficIcon(driver.trafficLevel) }} {{ driver.trafficLevel || 'N/A' }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========================================= -->
+        <!-- INCONSISTENCIAS (SI EXISTEN) -->
+        <!-- ========================================= -->
+        <div class="sidebar-section inconsistencies-section" *ngIf="getDriverInconsistencies().length > 0">
+          <div class="section-header">
+            <h4>⚠️ Requiere Atención</h4>
+            <span class="badge-count warning">{{ getDriverInconsistencies().length }}</span>
+          </div>
+
+          <div class="inconsistencies-list">
+            <div *ngFor="let inc of getDriverInconsistencies()" class="inconsistency-card">
+              <div class="inconsistency-info">
+                <strong>{{ inc.driverName }}</strong>
+                <small>{{ inc.issue }}</small>
+              </div>
+              <button
+                class="fix-btn"
+                (click)="resetDriverStatus(inc.driverName)">
+                🔧
+              </button>
             </div>
           </div>
 
-          <div class="empty-state" *ngIf="vehiclePositions.size === 0">
-            <p>🚗 No hay vehículos rastreados</p>
-            <small>Inicia la simulación o conecta vehículos reales</small>
-          </div>
+          <button
+            class="action-btn-full secondary"
+            (click)="showInconsistenciesReport()">
+            🔍 Ver Reporte Completo
+          </button>
         </div>
 
-        <!-- Rutas Activas -->
-        <div class="sidebar-section">
-          <h4>🚚 Rutas en Progreso</h4>
-          <div class="activity-list">
-            <div *ngFor="let route of activeRoutes"
-                 class="activity-item"
-                 [class.new-route]="route.isNew">
-              <div class="activity-icon" [style.background]="getRouteColor(route.status)">
-                {{ getRouteIcon(route.status) }}
-              </div>
-              <div class="activity-content">
-                <p><strong>{{ route.name || 'Ruta sin nombre' }}</strong></p>
-                <p class="route-info">
-                  {{ route.stops?.length || 0 }} paradas • {{ route.distance || 0 }} km
-                </p>
-                <span class="activity-time">{{ route.estimatedDuration || 'N/A' }}</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="empty-state" *ngIf="activeRoutes.length === 0">
-            <p>📦 No hay rutas activas</p>
-            <button class="btn-primary" (click)="navigateTo('routes/new')">
-              ➕ Crear Ruta
-            </button>
-          </div>
-        </div>
-
-        <!-- Acciones Rápidas -->
-        <div class="sidebar-section">
-          <h4>⚡ Acciones Rápidas</h4>
-          <div class="quick-actions">
-            <button class="action-btn primary" (click)="navigateTo('routes/new')">
-              ➕ Nueva Ruta
-            </button>
-            <button class="action-btn" (click)="navigateTo('routes')">
-              🗂️ Ver Todas las Rutas
-            </button>
-            <button class="action-btn" (click)="navigateTo('drivers')">
-              👥 Gestionar Conductores
-            </button>
-            <button class="action-btn" (click)="refreshData()">
-              🔄 Actualizar Datos
-            </button>
-          </div>
-        </div>
+        <!-- ========================================= -->
+        <!-- ACCIONES RÁPIDAS -->
+        <!-- ========================================= -->
+        <div class="sidebar-section quick-actions-section">
+           <h4>⚡ Acciones Rápidas</h4>
+           <div class="quick-actions-grid">
+             <button class="action-btn-quick primary" (click)="navigateTo('routes/new')">
+               <span class="btn-icon">➕</span>
+               <span class="btn-text">Nueva Ruta</span>
+             </button>
+             <button class="action-btn-quick" (click)="navigateTo('routes')">
+               <span class="btn-icon">🗂️</span>
+               <span class="btn-text">Ver Rutas</span>
+             </button>
+             <button class="action-btn-quick" (click)="showActiveRoutesOnMap()">
+               <span class="btn-icon">🗺️</span>
+               <span class="btn-text">Ver en Mapa</span>
+             </button>
+             <button class="action-btn-quick" (click)="showDetailedStats()">
+               <span class="btn-icon">📊</span>
+               <span class="btn-text">Estadísticas</span>
+             </button>
+             <button class="action-btn-quick" (click)="navigateTo('drivers')">
+               <span class="btn-icon">👥</span>
+               <span class="btn-text">Conductores</span>
+             </button>
+             <button class="action-btn-quick" (click)="exportDashboardData()">
+               <span class="btn-icon">💾</span>
+               <span class="btn-text">Exportar</span>
+             </button>
+             <button class="action-btn-quick" (click)="showDashboardHelp()">
+               <span class="btn-icon">❓</span>
+               <span class="btn-text">Ayuda</span>
+             </button>
+             <button class="action-btn-quick" (click)="refreshUnifiedData()">
+               <span class="btn-icon">🔄</span>
+               <span class="btn-text">Actualizar</span>
+             </button>
+           </div>
+         </div>
 
       </div>
     </section>

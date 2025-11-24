@@ -61,9 +61,25 @@
         <button class="btn-secondary" (click)="onCancel()">
           ❌ Cancelar
         </button>
-        <button class="btn-primary" (click)="onSubmit()" [disabled]="!isFormValid()">
-          {{ isEditMode ? '💾 Actualizar' : '✅ Crear' }} Ruta
+        <button
+          class="btn btn-success btn-lg w-100"
+          (click)="assignRouteAndStart()"
+          [disabled]="!isFormValid() || isCalculatingRoute"
+          *ngIf="!isCalculatingRoute">
+
+          <span class="btn-icon">🚀</span>
+          Asignar Ruta e Iniciar Recorrido
         </button>
+
+        <!-- Mensaje de estado -->
+        <div *ngIf="selectedDriver && selectedVehicle" class="availability-check">
+          <div class="alert alert-info">
+            <strong>⚠️ Atención:</strong> Al guardar esta ruta, el conductor
+            <strong>{{ selectedDriver.nombre }} {{ selectedDriver.apellido }}</strong>
+            y el vehículo <strong>{{ selectedVehicle.placa }}</strong>
+            cambiarán a estado <strong>"EN RUTA"</strong> y no estarán disponibles para otras asignaciones.
+          </div>
+        </div>
       </div>
     </div>
 

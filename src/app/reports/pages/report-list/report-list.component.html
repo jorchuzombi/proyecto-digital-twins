@@ -4,10 +4,10 @@
     <div class="header-content">
       <h1>
         <span class="header-icon">📊</span>
-        Reportes y Análisis
+        Reportes del Sistema
       </h1>
       <p class="header-subtitle">
-        Visualiza y gestiona todos los reportes de eficiencia, finanzas y operaciones de tus rutas
+        Visualiza métricas y análisis basados en datos reales de tu operación
       </p>
     </div>
     <button class="btn-primary" (click)="generateNewReport()">
@@ -19,39 +19,34 @@
   <!-- Stats Section -->
   <div class="stats-grid">
     <div class="stat-card">
-      <div class="stat-icon total">
-        📈
-      </div>
+      <div class="stat-icon total">📈</div>
       <div class="stat-info">
         <h3>{{ reports.length }}</h3>
         <p>Total de Reportes</p>
       </div>
     </div>
+
     <div class="stat-card">
-      <div class="stat-icon active">
-        ⚡
-      </div>
-      <div class="stat-info">
-        <h3>{{ getReportsByType('efficiency').length }}</h3>
-        <p>Reportes de Eficiencia</p>
-      </div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-icon optimized">
-        💰
-      </div>
-      <div class="stat-info">
-        <h3>{{ getReportsByType('financial').length }}</h3>
-        <p>Reportes Financieros</p>
-      </div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-icon revenue">
-        🚚
-      </div>
+      <div class="stat-icon active">⚡</div>
       <div class="stat-info">
         <h3>{{ getReportsByType('operational').length }}</h3>
-        <p>Reportes Operacionales</p>
+        <p>Operacionales</p>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon optimized">👥</div>
+      <div class="stat-info">
+        <h3>{{ getReportsByType('drivers').length }}</h3>
+        <p>Conductores</p>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon revenue">🚗</div>
+      <div class="stat-info">
+        <h3>{{ getReportsByType('vehicles').length + getReportsByType('routes').length }}</h3>
+        <p>Vehículos y Rutas</p>
       </div>
     </div>
   </div>
@@ -60,7 +55,7 @@
   <div class="filters-card">
     <div class="filters-header">
       <h3>Filtrar Reportes</h3>
-      <button class="btn-clear" (click)="selectedReportType = 'all'">
+      <button class="btn-clear" (click)="selectedReportType = 'all'; onFilterChange()">
         Limpiar Filtros
       </button>
     </div>
@@ -83,7 +78,7 @@
   <div *ngIf="loading" class="loading-state">
     <div class="spinner"></div>
     <h3>Cargando Reportes</h3>
-    <p>Estamos preparando tus análisis...</p>
+    <p>Obteniendo datos del sistema...</p>
   </div>
 
   <!-- Reports Grid -->
@@ -99,11 +94,14 @@
           <button class="btn-action view" (click)="viewReport(report)" title="Ver Reporte">
             👁️
           </button>
-          <button class="btn-action download" (click)="downloadReport(report)" title="Descargar">
+          <button class="btn-action download" (click)="downloadReport(report)" title="Descargar PDF">
             ⬇️
           </button>
           <button class="btn-action share" (click)="shareReport(report)" title="Compartir">
             📤
+          </button>
+          <button class="btn-action delete" (click)="deleteReport(report)" title="Eliminar">
+            🗑️
           </button>
         </div>
       </div>
@@ -122,7 +120,7 @@
         </div>
 
         <div class="report-data">
-          <div *ngFor="let key of getDataKeys(report.data)" class="data-item">
+          <div *ngFor="let key of getDataKeys(report.data).slice(0, 6)" class="data-item">
             <span class="data-label">{{ getDataLabel(key) }}:</span>
             <span class="data-value">{{ formatDataValue(report.data[key]) }}</span>
           </div>
@@ -142,7 +140,7 @@
     <div class="empty-icon">📊</div>
     <h3>No se encontraron reportes</h3>
     <p>No hay reportes que coincidan con los filtros seleccionados.</p>
-    <button class="btn-primary" (click)="selectedReportType = 'all'">
+    <button class="btn-primary" (click)="selectedReportType = 'all'; onFilterChange()">
       Ver Todos los Reportes
     </button>
   </div>

@@ -4,3 +4,4 @@ export const environment = {
   appVersion: packageInfo.version,
   production: true
 };
+  

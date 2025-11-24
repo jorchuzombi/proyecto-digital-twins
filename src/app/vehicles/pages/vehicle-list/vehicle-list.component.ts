@@ -15,6 +15,7 @@ import Swal from 'sweetalert2';
 })
 export class VehicleListComponent implements OnInit, OnDestroy {
   vehicles: VehicleListItem[] = [];
+  allVehicles: VehicleListItem[] = []; // 🔥 TODOS los vehículos sin filtrar
   loading = false;
   error = '';
 
@@ -29,9 +30,11 @@ export class VehicleListComponent implements OnInit, OnDestroy {
     tipo: undefined
   };
 
+  // Búsqueda mejorada
+  searchTerm: string = '';
   private searchSubject = new Subject<string>();
 
-  // Opciones para selects - TODOS los estados del backend
+  // Opciones para selects
   statusOptions = Object.values(VehicleStatus);
   tipoOptions = ['camion', 'van', 'moto', 'furgon', 'pickup', 'furgoneta'];
 
@@ -62,14 +65,14 @@ export class VehicleListComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.loadVehicles();
 
-    // Búsqueda con debounce - 800ms para búsqueda más pausada
+    // Búsqueda local instantánea - 300ms
     this.searchSubject.pipe(
-      debounceTime(800),
+      debounceTime(300),
       distinctUntilChanged(),
       takeUntil(this.destroy$)
     ).subscribe(searchTerm => {
-      this.filters.search = searchTerm;
-      this.applyFilters();
+      console.log('🔍 Filtrando localmente:', searchTerm);
+      this.applyLocalFilters();
     });
   }
 
@@ -78,45 +81,49 @@ export class VehicleListComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  // 📋 CARGAR VEHÍCULOS
+  // 📋 CARGAR VEHÍCULOS - UNA SOLA VEZ
   loadVehicles() {
     this.loading = true;
     this.error = '';
-    console.log('🔄 Cargando vehículos...');
+    console.log('🔄 Cargando TODOS los vehículos del backend...');
 
-    this.vehicleService.getVehicles(this.filters).subscribe({
+    // Cargar TODOS los vehículos sin filtros
+    const emptyFilters: VehicleFilters = {
+      page: 0,
+      size: 1000, // Cargar todos
+      search: '',
+      estado: undefined,
+      tipo: undefined
+    };
+
+    this.vehicleService.getVehicles(emptyFilters).subscribe({
       next: (response) => {
         console.log('📥 Respuesta completa:', response);
 
-        // ✅ CASO 1: Respuesta con estructura {success, data, content}
+        let loadedVehicles: VehicleListItem[] = [];
+
         if (response && response.success && response.data && response.data.content) {
-          this.vehicles = response.data.content;
-          console.log(`✅ ${this.vehicles.length} vehículos cargados (estructura completa)`);
+          loadedVehicles = response.data.content;
+        } else if (response && response.success && Array.isArray(response.data)) {
+          loadedVehicles = response.data;
+        } else if (Array.isArray(response)) {
+          loadedVehicles = response as any;
+        } else if (response && (response as any).content) {
+          loadedVehicles = (response as any).content;
         }
-        // ✅ CASO 2: Respuesta con {success, data} donde data es array
-        else if (response && response.success && Array.isArray(response.data)) {
-          this.vehicles = response.data;
-          console.log(`✅ ${this.vehicles.length} vehículos cargados (data array)`);
-        }
-        // ✅ CASO 3: Array directo sin wrapper
-        else if (Array.isArray(response)) {
-          this.vehicles = response as any;
-          console.log(`✅ ${this.vehicles.length} vehículos cargados (array directo)`);
-        }
-        // ✅ CASO 4: Response es el objeto data directamente
-        else if (response && (response as any).content) {
-          this.vehicles = (response as any).content;
-          console.log(`✅ ${this.vehicles.length} vehículos cargados (content directo)`);
-        }
-        else {
-          this.vehicles = [];
-          console.warn('⚠️ Formato de respuesta no reconocido:', response);
-        }
+
+        // Guardar TODOS los vehículos
+        this.allVehicles = loadedVehicles;
+        console.log(`✅ ${this.allVehicles.length} vehículos cargados del backend`);
+
+        // Aplicar filtros locales
+        this.applyLocalFilters();
 
         this.selectedVehicles.clear();
         this.selectAll = false;
         this.originalStates.clear();
         this.loading = false;
+        this.cdr.detectChanges();
       },
       error: (error) => {
         this.error = 'Error de conexión al cargar vehículos';
@@ -136,27 +143,64 @@ export class VehicleListComponent implements OnInit, OnDestroy {
     });
   }
 
-  // 🔍 APLICAR FILTROS
-  applyFilters() {
-    this.filters.page = 0;
-    console.log('🔍 Aplicando filtros:', this.filters);
-    this.loadVehicles();
-  }
+  // 🔍 FILTRADO LOCAL - INSTANTÁNEO
+  applyLocalFilters() {
+    console.log('🎯 Aplicando filtros locales...');
+    console.log('   - Búsqueda:', this.searchTerm);
+    console.log('   - Estado:', this.filters.estado);
+    console.log('   - Tipo:', this.filters.tipo);
 
-  // 🔍 BÚSQUEDA CON DEBOUNCE
-  onSearchChange(searchTerm: string) {
-    this.searchSubject.next(searchTerm);
-  }
+    let filtered = [...this.allVehicles];
 
-  // 🔍 BÚSQUEDA INSTANTÁNEA POR PLACA
-  onPlacaSearch(searchTerm: string) {
-    if (searchTerm.length >= 1) {
-      this.filters.search = searchTerm;
-      this.applyFilters();
-    } else if (searchTerm.length === 0) {
-      this.filters.search = '';
-      this.applyFilters();
+    // Filtro de búsqueda (placa, marca, modelo, tipo)
+    if (this.searchTerm && this.searchTerm.trim() !== '') {
+      const search = this.searchTerm.toLowerCase().trim();
+      filtered = filtered.filter(v => {
+        const placa = (v.placa || '').toLowerCase();
+        const marca = (v.marca || '').toLowerCase();
+        const modelo = (v.modelo || '').toLowerCase();
+        const tipo = (v.tipo || '').toLowerCase();
+
+        const match = placa.includes(search) ||
+                     marca.includes(search) ||
+                     modelo.includes(search) ||
+                     tipo.includes(search);
+
+        if (match) {
+          console.log(`   ✅ Coincide: ${v.placa} (${v.marca} ${v.modelo})`);
+        }
+
+        return match;
+      });
     }
+
+    // Filtro de estado
+    if (this.filters.estado) {
+      filtered = filtered.filter(v => v.estado === this.filters.estado);
+    }
+
+    // Filtro de tipo
+    if (this.filters.tipo) {
+      filtered = filtered.filter(v => v.tipo === this.filters.tipo);
+    }
+
+    this.vehicles = filtered;
+    console.log(`📊 Resultado: ${this.vehicles.length} vehículos filtrados de ${this.allVehicles.length} totales`);
+    this.cdr.detectChanges();
+  }
+
+  // 🔍 BÚSQUEDA MEJORADA
+  onSearch(event: any) {
+    const value = event.target.value;
+    this.searchTerm = value;
+    console.log('🔎 Búsqueda digitada:', value);
+    this.searchSubject.next(value);
+  }
+
+  // 🔄 APLICAR FILTROS DE SELECT
+  applyFilters() {
+    console.log('🔍 Cambiaron filtros de select');
+    this.applyLocalFilters();
   }
 
   // 🔄 CAMBIAR ESTADO
@@ -169,6 +213,11 @@ export class VehicleListComponent implements OnInit, OnDestroy {
     const index = this.vehicles.findIndex(v => v.id === vehicle.id);
     if (index !== -1) {
       this.vehicles[index].estado = nuevoEstado;
+    }
+
+    const allIndex = this.allVehicles.findIndex(v => v.id === vehicle.id);
+    if (allIndex !== -1) {
+      this.allVehicles[allIndex].estado = nuevoEstado;
     }
 
     this.vehicleService.updateVehicleStatus(vehicle.id, nuevoEstado).subscribe({
@@ -192,8 +241,6 @@ export class VehicleListComponent implements OnInit, OnDestroy {
             toast: true,
             position: 'top-end'
           });
-
-          setTimeout(() => this.loadVehicles(), 500);
         } else {
           this.revertStatusChange(vehicle.id, estadoAnterior);
           console.error('❌ Error en respuesta:', response);
@@ -238,9 +285,15 @@ export class VehicleListComponent implements OnInit, OnDestroy {
     const index = this.vehicles.findIndex(v => v.id === vehicleId);
     if (index !== -1) {
       this.vehicles[index].estado = originalStatus;
-      console.log(`🔄 Estado revertido para ${vehicleId}: ${originalStatus}`);
     }
+
+    const allIndex = this.allVehicles.findIndex(v => v.id === vehicleId);
+    if (allIndex !== -1) {
+      this.allVehicles[allIndex].estado = originalStatus;
+    }
+
     this.originalStates.delete(vehicleId);
+    console.log(`🔄 Estado revertido para ${vehicleId}: ${originalStatus}`);
   }
 
   // 🗑️ ELIMINAR VEHÍCULO
@@ -264,6 +317,7 @@ export class VehicleListComponent implements OnInit, OnDestroy {
 
             if (isSuccess) {
               Swal.fire('¡Eliminado!', 'Vehículo eliminado exitosamente', 'success');
+              // Recargar desde el backend
               this.loadVehicles();
             } else {
               Swal.fire('Error', response?.message || 'No se pudo eliminar', 'error');
@@ -294,7 +348,6 @@ export class VehicleListComponent implements OnInit, OnDestroy {
     };
     this.showForm = true;
     setTimeout(() => this.cdr.detectChanges(), 0);
-    console.log('✅ Formulario nuevo inicializado:', this.formData);
   }
 
   // ✏️ EDITAR VEHÍCULO
@@ -316,12 +369,9 @@ export class VehicleListComponent implements OnInit, OnDestroy {
 
         let vehicleData: Vehicle | null = null;
 
-        // ✅ CASO 1: {success: true, data: {...}}
         if (response && response.success && response.data) {
           vehicleData = response.data;
-        }
-        // ✅ CASO 2: Objeto vehículo directo (sin wrapper)
-        else if (response && (response as any).id && (response as any).placa) {
+        } else if (response && (response as any).id && (response as any).placa) {
           vehicleData = response as any;
         }
 
@@ -339,11 +389,7 @@ export class VehicleListComponent implements OnInit, OnDestroy {
             kilometraje: vehicleData.kilometraje || 0
           };
           this.showForm = true;
-          setTimeout(() => {
-            this.cdr.detectChanges();
-            console.log('📝 Editando vehículo:', this.formData);
-            console.log('📝 isFormValid:', this.isFormValid());
-          }, 0);
+          setTimeout(() => this.cdr.detectChanges(), 0);
         } else {
           Swal.fire('Error', 'No se pudieron cargar los datos', 'error');
         }
@@ -362,8 +408,6 @@ export class VehicleListComponent implements OnInit, OnDestroy {
       Swal.fire('Campos incompletos', 'Completa todos los campos obligatorios', 'warning');
       return;
     }
-
-    console.log('💾 Guardando vehículo:', this.formData);
 
     Swal.fire({
       title: this.editingVehicle ? 'Actualizando...' : 'Creando...',
@@ -389,7 +433,6 @@ export class VehicleListComponent implements OnInit, OnDestroy {
 
       this.vehicleService.updateVehicle(this.editingVehicle.id, updateData).subscribe({
         next: (response) => {
-          console.log('✅ Respuesta actualización:', response);
           Swal.close();
 
           const isSuccess = response === null || response?.success === true;
@@ -398,7 +441,6 @@ export class VehicleListComponent implements OnInit, OnDestroy {
             this.showForm = false;
             Swal.fire('¡Actualizado!', 'Vehículo actualizado exitosamente', 'success');
             this.loadVehicles();
-            this.cdr.detectChanges();
           } else {
             Swal.fire('Error', response?.message || 'No se pudo actualizar', 'error');
           }
@@ -424,7 +466,6 @@ export class VehicleListComponent implements OnInit, OnDestroy {
 
       this.vehicleService.createVehicle(createData).subscribe({
         next: (response) => {
-          console.log('✅ Respuesta creación:', response);
           Swal.close();
 
           const isSuccess = response?.success === true || (response?.data && response.data.id);
@@ -433,7 +474,6 @@ export class VehicleListComponent implements OnInit, OnDestroy {
             this.showForm = false;
             Swal.fire('¡Creado!', 'Vehículo creado exitosamente', 'success');
             this.loadVehicles();
-            this.cdr.detectChanges();
           } else {
             Swal.fire('Error', response?.message || 'No se pudo crear', 'error');
           }
@@ -462,17 +502,14 @@ export class VehicleListComponent implements OnInit, OnDestroy {
         if (result.isConfirmed) {
           this.showForm = false;
           this.editingVehicle = null;
-          this.cdr.detectChanges();
         }
       });
     } else {
       this.showForm = false;
       this.editingVehicle = null;
-      this.cdr.detectChanges();
     }
   }
 
-  // ✅ VERIFICAR CAMBIOS SIN GUARDAR
   hasUnsavedChanges(): boolean {
     if (!this.editingVehicle) return false;
 
@@ -486,14 +523,13 @@ export class VehicleListComponent implements OnInit, OnDestroy {
            this.formData.kilometraje !== this.editingVehicle.kilometraje;
   }
 
-  // 🔄 FORZAR DETECCIÓN DE CAMBIOS
   onFormInputChange(): void {
     this.cdr.detectChanges();
-    console.log('📝 Formulario actualizado');
   }
 
   // 🔄 LIMPIAR FILTROS
   clearFilters() {
+    this.searchTerm = '';
     this.filters = {
       page: 0,
       size: 10,
@@ -503,7 +539,7 @@ export class VehicleListComponent implements OnInit, OnDestroy {
     };
     this.selectedVehicles.clear();
     this.selectAll = false;
-    this.loadVehicles();
+    this.applyLocalFilters();
   }
 
   // ✅ SELECCIÓN MASIVA
@@ -630,13 +666,6 @@ export class VehicleListComponent implements OnInit, OnDestroy {
     let completed = 0;
     let errors = 0;
 
-    selectedIds.forEach(id => {
-      const vehicle = this.vehicles.find(v => v.id === id);
-      if (vehicle) {
-        this.originalStates.set(id, vehicle.estado);
-      }
-    });
-
     Swal.fire({
       title: 'Actualizando...',
       text: `Cambiando estado de ${selectedIds.length} vehículo(s)`,
@@ -646,22 +675,12 @@ export class VehicleListComponent implements OnInit, OnDestroy {
     });
 
     selectedIds.forEach((id) => {
-      const vehicleIndex = this.vehicles.findIndex(v => v.id === id);
-      if (vehicleIndex !== -1) {
-        this.vehicles[vehicleIndex].estado = newStatus;
-      }
-
       this.vehicleService.updateVehicleStatus(id, newStatus).subscribe({
         next: (response) => {
           if (response === null || response?.success === true) {
             completed++;
-            this.originalStates.delete(id);
           } else {
             errors++;
-            const original = this.originalStates.get(id);
-            if (original && vehicleIndex !== -1) {
-              this.vehicles[vehicleIndex].estado = original;
-            }
           }
 
           if (completed + errors === selectedIds.length) {
@@ -670,11 +689,6 @@ export class VehicleListComponent implements OnInit, OnDestroy {
         },
         error: () => {
           errors++;
-          const original = this.originalStates.get(id);
-          if (original && vehicleIndex !== -1) {
-            this.vehicles[vehicleIndex].estado = original;
-          }
-
           if (completed + errors === selectedIds.length) {
             this.handleBulkStatusResult(completed, errors, newStatus);
           }
@@ -695,6 +709,8 @@ export class VehicleListComponent implements OnInit, OnDestroy {
     } else {
       Swal.fire('Parcial', `${completed} actualizados, ${errors} errores`, 'warning');
     }
+
+    this.loadVehicles();
   }
 
   // 📄 EXPORTAR CSV
@@ -735,7 +751,6 @@ export class VehicleListComponent implements OnInit, OnDestroy {
     return [headers, ...rows].map(row => row.map(field => `"${field}"`).join(',')).join('\n');
   }
 
-  // 🏷️ BADGE DE ESTADO - Todos los estados del backend
   getStatusBadgeClass(status: VehicleStatus): string {
     switch (status) {
       case VehicleStatus.ACTIVO:
@@ -753,7 +768,6 @@ export class VehicleListComponent implements OnInit, OnDestroy {
     }
   }
 
-  // ESTADÍSTICAS - Conteo correcto según estados del backend
   getActiveVehiclesCount(): number {
     return this.vehicles.filter(v =>
       v.estado === VehicleStatus.ACTIVO || v.estado === VehicleStatus.DISPONIBLE
@@ -782,7 +796,6 @@ export class VehicleListComponent implements OnInit, OnDestroy {
     return 'N/A';
   }
 
-  // VALIDACIÓN
   isFormValid(): boolean {
     const placaValida = this.formData.placa && this.formData.placa.trim().length > 0;
     const tipoValido = this.formData.tipo && this.formData.tipo.trim().length > 0;
@@ -792,20 +805,7 @@ export class VehicleListComponent implements OnInit, OnDestroy {
                        this.formData.anio >= 2000 &&
                        this.formData.anio <= this.getMaxYear();
 
-    const isValid = placaValida && tipoValido && marcaValida && modeloValido && anioValido;
-
-    if (!isValid) {
-      console.log('🔍 Validación del formulario:', {
-        placaValida,
-        tipoValido,
-        marcaValida,
-        modeloValido,
-        anioValido,
-        formData: this.formData
-      });
-    }
-
-    return isValid;
+    return placaValida && tipoValido && marcaValida && modeloValido && anioValido;
   }
 
   getMaxYear(): number {

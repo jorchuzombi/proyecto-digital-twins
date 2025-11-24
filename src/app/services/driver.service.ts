@@ -191,6 +191,22 @@ export class DriverService {
       );
   }
 
+  // ===== ACTUALIZAR ESTADO DE CONDUCTOR =====
+  updateDriverStatus(driverId: string, status: 'DISPONIBLE' | 'EN_RUTA' | 'DESCANSO' | 'NO_DISPONIBLE'): Observable<any> {
+    console.log(`🔄 Actualizando estado del conductor ${driverId} a: ${status}`);
+
+    return this.http.patch(
+      `${this.DRIVERS_URL}/${driverId}/estado`,
+      { estado: status },
+      this.httpOptions
+    ).pipe(
+      tap(() => {
+        console.log(`✅ Estado del conductor ${driverId} actualizado a: ${status}`);
+      }),
+      catchError((error) => this.handleError('updateDriverStatus', error))
+    );
+  }
+
   // ===== CAMBIAR DISPONIBILIDAD =====
   updateAvailability(id: string, disponibilidad: string): Observable<Driver> {
     console.log(`📡 PATCH ${this.DRIVERS_URL}/${id}/disponibilidad`);
@@ -355,7 +371,7 @@ export class DriverService {
     switch (disponibilidad) {
       case 'DISPONIBLE': return '#48bb78';
       case 'EN_RUTA': return '#ed8936';
-      case 'DESCANSO': return '#4299e1';
+      case 'DESCANSO': return '#d7dde2ff';
       case 'NO_DISPONIBLE': return '#e53e3e';
       default: return '#718096';
     }

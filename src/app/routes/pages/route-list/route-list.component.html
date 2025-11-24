@@ -9,13 +9,20 @@
       </h1>
       <p class="header-subtitle">Optimiza y gestiona todas las rutas de entrega</p>
     </div>
-    <button class="btn-primary" (click)="navigateToNewRoute()">
-      <span class="btn-icon">➕</span>
-      Nueva Ruta
-    </button>
+    <div class="header-actions">
+      <button class="btn-primary" (click)="navigateToNewRoute()">
+        <span class="btn-icon">➕</span>
+        Nueva Ruta
+      </button>
+      <!-- ===== BOTÓN NUEVO: ACTUALIZAR RUTAS ===== -->
+      <button class="btn-secondary" (click)="refreshRoutes()" title="Recargar toda la lista de rutas">
+        <span class="btn-icon">🔄</span>
+        Actualizar Rutas
+      </button>
+    </div>
   </div>
 
-  <!-- Estadísticas Rápidas -->
+  <!-- Estadísticas Rápidas (SIN Ingresos ni Ganancias) -->
   <div class="stats-grid">
     <div class="stat-card">
       <div class="stat-icon total">📊</div>
@@ -24,6 +31,7 @@
         <p>Total Rutas</p>
       </div>
     </div>
+
     <div class="stat-card">
       <div class="stat-icon active">🚀</div>
       <div class="stat-info">
@@ -31,6 +39,7 @@
         <p>En Progreso</p>
       </div>
     </div>
+
     <div class="stat-card">
       <div class="stat-icon optimized">⭐</div>
       <div class="stat-info">
@@ -38,28 +47,14 @@
         <p>Completadas</p>
       </div>
     </div>
-    <div class="stat-card">
-      <div class="stat-icon revenue">💰</div>
-      <div class="stat-info">
-        <h3>{{ formatCurrency(getTotalRevenue()) }}</h3>
-        <p>Ingresos Totales</p>
-      </div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-icon profit">📈</div>
-      <div class="stat-info">
-        <h3>{{ formatCurrency(getTotalProfit()) }}</h3>
-        <p>Ganancia Total</p>
-      </div>
-    </div>
   </div>
 
   <!-- Filtros -->
   <div class="filters-card">
     <div class="filters-header">
-      <h3>🔍 Filtros de Búsqueda</h3>
+      <h3>Filtros de Búsqueda</h3>
       <button class="btn-clear" (click)="clearFilters()">
-        🧹 Limpiar Filtros
+        Limpiar Filtros
       </button>
     </div>
     <div class="filters-grid">
@@ -98,15 +93,17 @@
   <!-- Loading State -->
   <div *ngIf="loading" class="loading-state">
     <div class="spinner"></div>
-    <h3>Cargando datos...</h3>
-    <p>Obteniendo rutas y conductores</p>
+    <h3>Cargando Rutas</h3>
+    <p>Obteniendo datos del sistema...</p>
   </div>
 
   <!-- Tabla de Rutas -->
   <div *ngIf="!loading" class="table-container">
     <div class="table-header">
-      <h3>📋 Lista de Rutas</h3>
-      <span class="results-count">{{ filteredRoutes.length }} rutas encontradas</span>
+      <h3>Lista de Rutas</h3>
+      <span class="results-count">
+        <strong>{{ filteredRoutes.length }}</strong> ruta(s) encontrada(s)
+      </span>
     </div>
 
     <div *ngIf="filteredRoutes.length === 0" class="empty-state">
@@ -115,14 +112,15 @@
       <p *ngIf="routes.length === 0">No hay rutas registradas en el sistema</p>
       <p *ngIf="routes.length > 0">No hay rutas que coincidan con los filtros aplicados</p>
       <button class="btn-primary" (click)="navigateToNewRoute()" *ngIf="routes.length === 0">
-        ➕ Crear Primera Ruta
+        Crear Primera Ruta
       </button>
       <button class="btn-primary" (click)="clearFilters()" *ngIf="routes.length > 0">
         Ver todas las rutas
       </button>
     </div>
 
-    <div *ngIf="filteredRoutes.length > 0" class="table-responsive">
+    @if (filteredRoutes.length > 0) {
+    <div class="table-responsive">
       <table class="routes-table">
         <thead>
           <tr>
@@ -134,7 +132,6 @@
             <th class="col-distance">Distancia</th>
             <th class="col-duration">Duración</th>
             <th class="col-status">Estado</th>
-            <th class="col-profit">Ganancia</th>
             <th class="col-actions">Acciones</th>
           </tr>
         </thead>
@@ -145,7 +142,7 @@
               <div class="name-cell">
                 <strong>{{ route.name }}</strong>
                 <small *ngIf="route.startTime && route.endTime">
-                  🕒 {{ route.startTime }} - {{ route.endTime }}
+                  {{ route.startTime }} - {{ route.endTime }}
                 </small>
               </div>
             </td>
@@ -178,14 +175,22 @@
 
             <!-- Ciudad -->
             <td class="city-cell">
-              <span class="city-badge">📍 {{ route.city || 'N/A' }}</span>
+              <span class="city-badge">{{ route.city || 'N/A' }}</span>
             </td>
 
             <!-- Paradas -->
             <td class="stops-cell">
-              <span class="stops-badge">
-                <strong>{{ route.stops || 0 }}</strong>
-              </span>
+              <ul class="stops-list">
+                <li *ngFor="let stop of (route.stops && route.stops.length ? route.stops.slice(0,3) : [])">
+                  {{ stop.name || stop.address || stop }}
+                </li>
+                <li *ngIf="route.stops && route.stops.length > 3" class="stops-more">
+                  +{{ route.stops.length - 3 }} más
+                </li>
+                <li *ngIf="(!route.stops || route.stops.length === 0) && route.stopsNames">
+                  <small>{{ route.stopsNames }}</small>
+                </li>
+              </ul>
             </td>
 
             <!-- Distancia -->
@@ -203,20 +208,6 @@
               <span class="status-badge" [ngClass]="getStatusBadgeClass(route.status)">
                 {{ getStatusIcon(route.status) }} {{ getStatusText(route.status) }}
               </span>
-            </td>
-
-            <!-- Ganancia -->
-            <td class="profit-cell">
-              <div class="profit-wrapper">
-                <div class="profit-amount"
-                     [class.positive]="calculateProfit(route) > 0"
-                     [class.negative]="calculateProfit(route) < 0">
-                  {{ formatCurrency(calculateProfit(route)) }}
-                </div>
-                <small class="profit-percentage">
-                  {{ getProfitPercentage(route) | number:'1.0-0' }}%
-                </small>
-              </div>
             </td>
 
             <!-- Acciones -->
@@ -250,5 +241,6 @@
         </tbody>
       </table>
     </div>
+    }
   </div>
 </div>

@@ -1,16 +1,21 @@
-// src/app/services/vehicle-simulator.service.ts
 import { Injectable, inject } from '@angular/core';
 import { RealTimeRoutingService, VehiclePosition } from './real-time-routing.service';
+import { RouteService } from './route.service';
+import { RoutingService } from './routing.service';
 import * as L from 'leaflet';
 import { interval, Subject, Subscription } from 'rxjs';
 
 interface SimulatedVehicle {
   position: VehiclePosition;
-  target: { lat: number; lng: number };
   marker: L.Marker;
   path: [number, number][];
   currentPathIndex: number;
   routePolyline?: L.Polyline;
+  speed: number;
+  routeId: string;
+  routeName: string;
+  stops: any[];
+  currentStopIndex: number;
 }
 
 @Injectable({
@@ -18,369 +23,385 @@ interface SimulatedVehicle {
 })
 export class VehicleSimulatorService {
   private realtimeService = inject(RealTimeRoutingService);
+  private routeService = inject(RouteService);
+  private routingService = inject(RoutingService);
 
   private simulatedVehicles: Map<string, SimulatedVehicle> = new Map();
   private updateSubscription?: Subscription;
   private map?: L.Map;
   private isSimulating = false;
 
-  // Sujeto para emitir actualizaciones
   public positionUpdates$ = new Subject<VehiclePosition>();
 
-  // Configuración de Bogotá
-  private readonly BOGOTA_BOUNDS = {
-    north: 4.8,
-    south: 4.5,
-    east: -73.95,
-    west: -74.15
-  };
-
   constructor() {
-    console.log('🎮 VehicleSimulatorService inicializado');
+    console.log('🎮 VehicleSimulator - RUTAS REALES del módulo');
   }
 
   /**
-   * Iniciar simulación de vehículos
+   * ✅ Cargar SOLO rutas REALES del módulo de Rutas
    */
-  startSimulation(vehicleCount: number = 5, map?: L.Map) {
+  startSimulation(map?: L.Map) {
     if (this.isSimulating) {
-      console.warn('⚠️ La simulación ya está en curso');
+      console.warn('⚠️ Ya está en ejecución');
       return;
     }
 
     this.map = map;
     this.isSimulating = true;
 
-    console.log(`🚀 Iniciando simulación con ${vehicleCount} vehículos`);
+    console.log('🚀 Cargando rutas REALES desde el backend...');
 
-    // Crear vehículos simulados
-    this.createSimulatedVehicles(vehicleCount);
+    // Cargar SOLO rutas IN_PROGRESS
+    this.routeService.getAllRoutes().subscribe({
+      next: (routes) => {
+        const activeRoutes = routes.filter(r =>
+          r.status === 'IN_PROGRESS' &&
+          r.stops &&
+          r.stops.length >= 2
+        );
 
-    // Actualizar posiciones cada 2 segundos
-    this.updateSubscription = interval(2000).subscribe(() => {
-      this.updateAllVehicles();
+        console.log(`📦 Total de rutas: ${routes.length}`);
+        console.log(`✅ Rutas activas (IN_PROGRESS): ${activeRoutes.length}`);
+
+        if (activeRoutes.length === 0) {
+          console.warn('⚠️ NO HAY RUTAS ACTIVAS');
+          console.log('💡 Pasos para ver vehículos:');
+          console.log('   1. Ve al módulo de Rutas');
+          console.log('   2. Crea una nueva ruta');
+          console.log('   3. Asigna conductor y vehículo');
+          console.log('   4. Haz clic en "Asignar Ruta e Iniciar Recorrido"');
+          console.log('   5. Vuelve al Dashboard');
+          return;
+        }
+
+        // Crear vehículos para cada ruta activa
+        this.createVehiclesFromRealRoutes(activeRoutes);
+
+        // Actualizar posiciones cada 2 segundos
+        this.updateSubscription = interval(2000).subscribe(() => {
+          this.updateAllVehicles();
+        });
+      },
+      error: (error) => {
+        console.error('❌ Error cargando rutas:', error);
+      }
     });
   }
 
   /**
-   * Detener simulación
+   * 🚗 Crear vehículos desde rutas REALES
    */
+  private async createVehiclesFromRealRoutes(routes: any[]) {
+    console.log('🚗 Creando vehículos desde rutas reales...');
+
+    for (let i = 0; i < routes.length; i++) {
+      const route = routes[i];
+
+      try {
+        if (!route.stops || route.stops.length < 2) {
+          console.warn(`⚠️ Ruta ${route.name} sin suficientes paradas`);
+          continue;
+        }
+
+        // Ordenar paradas
+        const sortedStops = [...route.stops].sort((a, b) => a.stopOrder - b.stopOrder);
+
+        const vehicleId = route.vehicle || `VEH-${route.id}`;
+        const driverId = this.extractDriverId(route);
+        const driverName = this.extractDriverName(route);
+
+        console.log(`📍 Creando vehículo para: ${route.name}`);
+        console.log(`   - Vehículo: ${vehicleId}`);
+        console.log(`   - Conductor: ${driverName}`);
+        console.log(`   - Paradas: ${sortedStops.length}`);
+
+        // Posición inicial: primera parada
+        const firstStop = sortedStops[0];
+        const speed = 40; // Velocidad constante
+
+        const position: VehiclePosition = {
+          vehicleId,
+          driverId,
+          driverName,
+          latitude: firstStop.latitude,
+          longitude: firstStop.longitude,
+          speed,
+          status: 'BUSY',
+          lastUpdate: new Date(),
+          heading: 0,
+          eta: route.estimatedDuration,
+          distanceToDestination: route.distance,
+          currentRouteId: route.id
+        };
+
+        // Crear marcador
+        const marker = this.createVehicleMarker(position);
+        if (!marker) continue;
+
+        // Calcular ruta REAL completa con OSRM
+        await this.calculateAndAssignRoute(
+          vehicleId,
+          position,
+          marker,
+          route,
+          sortedStops,
+          speed,
+          i
+        );
+
+      } catch (error) {
+        console.error(`❌ Error con ruta ${route.name}:`, error);
+      }
+    }
+
+    if (this.simulatedVehicles.size === 0) {
+      console.warn('❌ NO SE CREÓ NINGÚN VEHÍCULO');
+    } else {
+      console.log(`✅ ${this.simulatedVehicles.size} vehículo(s) en movimiento`);
+    }
+  }
+
+  /**
+   * 🗺️ Calcular ruta REAL con OSRM
+   */
+  private async calculateAndAssignRoute(
+    vehicleId: string,
+    position: VehiclePosition,
+    marker: L.Marker,
+    route: any,
+    stops: any[],
+    speed: number,
+    colorIndex: number
+  ) {
+    const waypoints: [number, number][] = stops.map(s => [s.latitude, s.longitude]);
+
+    console.log(`🗺️ Calculando ruta OSRM para ${route.name}...`);
+
+    return new Promise<void>((resolve) => {
+      this.routingService.getRealRoute(waypoints).subscribe({
+        next: (routeData) => {
+          if (!routeData || !routeData.coordinates || routeData.coordinates.length === 0) {
+            console.error(`❌ OSRM no devolvió ruta para ${route.name}`);
+            resolve();
+            return;
+          }
+
+          const realPath: [number, number][] = routeData.coordinates.map(
+            coord => [coord[0], coord[1]] as [number, number]
+          );
+
+          console.log(`✅ Ruta REAL calculada: ${realPath.length} puntos`);
+
+          // Dibujar ruta en el mapa
+          const routePolyline = this.drawRoute(realPath, colorIndex, route.name);
+
+          // Guardar vehículo
+          this.simulatedVehicles.set(vehicleId, {
+            position,
+            marker,
+            path: realPath,
+            currentPathIndex: 0,
+            routePolyline,
+            speed,
+            routeId: route.id,
+            routeName: route.name,
+            stops: stops,
+            currentStopIndex: 0
+          });
+
+          console.log(`🎯 Vehículo ${vehicleId} listo en ruta: ${route.name}`);
+          resolve();
+        },
+        error: (error) => {
+          console.error(`❌ Error OSRM para ${route.name}:`, error);
+          resolve();
+        }
+      });
+    });
+  }
+
+  /**
+   * 🎨 Dibujar ruta en el mapa
+   */
+  private drawRoute(path: [number, number][], colorIndex: number, routeName: string): L.Polyline | undefined {
+    if (!this.map) return undefined;
+
+    const latlngs = path.map(p => L.latLng(p[0], p[1]));
+    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+    const color = colors[colorIndex % colors.length];
+
+    const polyline = L.polyline(latlngs, {
+      color: color,
+      weight: 4,
+      opacity: 0.7,
+      className: 'route-realistic'
+    }).addTo(this.map);
+
+    polyline.bindTooltip(routeName, {
+      permanent: false,
+      direction: 'center'
+    });
+
+    return polyline;
+  }
+
+  /**
+   * 🔄 Actualizar posiciones
+   */
+  private updateAllVehicles() {
+    this.simulatedVehicles.forEach((vehicle, vehicleId) => {
+      if (vehicle.path.length === 0) return;
+
+      vehicle.currentPathIndex++;
+
+      if (vehicle.currentPathIndex >= vehicle.path.length) {
+        console.log(`🏁 ${vehicle.routeName} completada`);
+        this.completeRoute(vehicle, vehicleId);
+        return;
+      }
+
+      const [lat, lng] = vehicle.path[vehicle.currentPathIndex];
+      const heading = this.calculateHeading(
+        vehicle.position.latitude,
+        vehicle.position.longitude,
+        lat,
+        lng
+      );
+
+      vehicle.position = {
+        ...vehicle.position,
+        latitude: lat,
+        longitude: lng,
+        heading,
+        lastUpdate: new Date()
+      };
+
+      // Actualizar marcador
+      if (this.map && vehicle.marker) {
+        vehicle.marker.setLatLng([lat, lng]);
+        vehicle.marker.setIcon(this.createVehicleIcon(vehicle.position));
+        this.updatePopup(vehicle.marker, vehicle);
+      }
+
+      this.positionUpdates$.next(vehicle.position);
+    });
+  }
+
+  /**
+   * 🏁 Completar ruta
+   */
+  private completeRoute(vehicle: SimulatedVehicle, vehicleId: string) {
+    if (this.map) {
+      if (vehicle.marker) this.map.removeLayer(vehicle.marker);
+      if (vehicle.routePolyline) this.map.removeLayer(vehicle.routePolyline);
+    }
+
+    this.simulatedVehicles.delete(vehicleId);
+
+    this.realtimeService.completeRoute(vehicle.routeId).subscribe({
+      next: () => console.log(`✅ Ruta ${vehicle.routeId} completada en backend`),
+      error: (e) => console.error('Error completando ruta:', e)
+    });
+  }
+
   stopSimulation() {
     console.log('🛑 Deteniendo simulación...');
-
     this.isSimulating = false;
     this.updateSubscription?.unsubscribe();
 
-    // Remover todos los marcadores y polylines del mapa
     if (this.map) {
-      this.simulatedVehicles.forEach(vehicle => {
-        this.map!.removeLayer(vehicle.marker);
-        if (vehicle.routePolyline) {
-          this.map!.removeLayer(vehicle.routePolyline);
-        }
+      this.simulatedVehicles.forEach(v => {
+        if (v.marker) this.map!.removeLayer(v.marker);
+        if (v.routePolyline) this.map!.removeLayer(v.routePolyline);
       });
     }
 
     this.simulatedVehicles.clear();
   }
 
-  /**
-   * Obtener posiciones actuales
-   */
   getCurrentPositions(): VehiclePosition[] {
     return Array.from(this.simulatedVehicles.values()).map(v => v.position);
   }
 
-  /**
-   * Crear vehículos simulados
-   */
-  private createSimulatedVehicles(count: number) {
-    const statuses: ('AVAILABLE' | 'BUSY' | 'OFFLINE')[] = ['BUSY', 'BUSY', 'AVAILABLE', 'BUSY', 'AVAILABLE'];
+  private createVehicleMarker(position: VehiclePosition): L.Marker | undefined {
+    if (!this.map) return undefined;
 
-    for (let i = 0; i < count; i++) {
-      const vehicleId = `vehicle-${String(i + 1).padStart(3, '0')}`;
-      const status = statuses[i % statuses.length];
-
-      // Posición inicial aleatoria en Bogotá
-      const startLat = this.randomInRange(this.BOGOTA_BOUNDS.south, this.BOGOTA_BOUNDS.north);
-      const startLng = this.randomInRange(this.BOGOTA_BOUNDS.west, this.BOGOTA_BOUNDS.east);
-
-      // Destino aleatorio en Bogotá
-      const targetLat = this.randomInRange(this.BOGOTA_BOUNDS.south, this.BOGOTA_BOUNDS.north);
-      const targetLng = this.randomInRange(this.BOGOTA_BOUNDS.west, this.BOGOTA_BOUNDS.east);
-
-      const position: VehiclePosition = {
-        vehicleId,
-        vehicleName: `Vehículo ${i + 1}`,
-        lat: startLat,
-        lng: startLng,
-        latitude: startLat,
-        longitude: startLng,
-        speed: status === 'BUSY' ? this.randomInRange(30, 60) : 0,
-        status,
-        lastUpdate: new Date(),
-        heading: 0,
-        eta: status === 'BUSY' ? Math.ceil(this.randomInRange(10, 45)) : 0,
-        distance: status === 'BUSY' ? this.randomInRange(5, 25) : 0,
-        driverName: `Conductor ${i + 1}`,
-        distanceToDestination: status === 'BUSY' ? this.randomInRange(5, 25) : 0
-      };
-
-      // Crear marcador en el mapa
-      let marker: L.Marker | undefined;
-      if (this.map) {
-        marker = this.createVehicleMarker(position);
-      }
-
-      // Generar path simple (línea recta interpolada)
-      const path = this.generatePath(startLat, startLng, targetLat, targetLng);
-
-      if (marker) {
-        // Crear polyline para la ruta
-        const routePolyline = this.createRoutePolyline(path);
-
-        this.simulatedVehicles.set(vehicleId, {
-          position,
-          target: { lat: targetLat, lng: targetLng },
-          marker,
-          path,
-          currentPathIndex: 0,
-          routePolyline
-        });
-      }
-
-      console.log(`✅ Vehículo ${vehicleId} creado - Estado: ${status}`);
-    }
-  }
-
-  /**
-   * Generar path interpolado entre dos puntos
-   */
-  private generatePath(startLat: number, startLng: number, endLat: number, endLng: number): [number, number][] {
-    const steps = 50; // Número de puntos intermedios
-    const path: [number, number][] = [];
-
-    for (let i = 0; i <= steps; i++) {
-      const ratio = i / steps;
-      const lat = startLat + (endLat - startLat) * ratio;
-      const lng = startLng + (endLng - startLng) * ratio;
-      path.push([lat, lng]);
-    }
-
-    return path;
-  }
-
-  /**
-   * Actualizar todos los vehículos
-   */
-  private updateAllVehicles() {
-    this.simulatedVehicles.forEach((vehicle, vehicleId) => {
-      if (vehicle.position.status === 'BUSY') {
-        // Mover al siguiente punto del path
-        vehicle.currentPathIndex++;
-
-        if (vehicle.currentPathIndex >= vehicle.path.length) {
-          // Llegó al destino, asignar nuevo destino
-          this.assignNewTarget(vehicle);
-        } else {
-          // Actualizar posición
-          const [lat, lng] = vehicle.path[vehicle.currentPathIndex];
-
-          // Calcular heading
-          const prevPosition = vehicle.position;
-          const heading = this.realtimeService.calculateHeading(
-            prevPosition.lat,
-            prevPosition.lng,
-            lat,
-            lng
-          );
-
-          // Actualizar posición
-          vehicle.position = {
-            ...vehicle.position,
-            lat,
-            lng,
-            latitude: lat,
-            longitude: lng,
-            heading,
-            lastUpdate: new Date(),
-            eta: Math.max(0, (vehicle.position.eta || 0) - 0.5), // Reducir ETA
-            distance: Math.max(0, (vehicle.position.distance || 0) - 0.1), // Reducir distancia
-            distanceToDestination: Math.max(0, (vehicle.position.distanceToDestination || 0) - 0.1)
-          };
-
-          // Actualizar marcador en el mapa
-          if (this.map && vehicle.marker) {
-            vehicle.marker.setLatLng([lat, lng]);
-
-            // Actualizar icono con rotación
-            const icon = this.createVehicleIcon(vehicle.position);
-            vehicle.marker.setIcon(icon);
-
-            // Actualizar popup
-            const popupContent = this.createPopupContent(vehicle.position);
-            vehicle.marker.setPopupContent(popupContent);
-          }
-
-          // Emitir actualización
-          this.positionUpdates$.next(vehicle.position);
-        }
-      }
-    });
-  }
-
-  /**
-   * Asignar nuevo destino a un vehículo
-   */
-  private assignNewTarget(vehicle: SimulatedVehicle) {
-    const targetLat = this.randomInRange(this.BOGOTA_BOUNDS.south, this.BOGOTA_BOUNDS.north);
-    const targetLng = this.randomInRange(this.BOGOTA_BOUNDS.west, this.BOGOTA_BOUNDS.east);
-
-    vehicle.target = { lat: targetLat, lng: targetLng };
-    vehicle.path = this.generatePath(
-      vehicle.position.lat,
-      vehicle.position.lng,
-      targetLat,
-      targetLng
-    );
-    vehicle.currentPathIndex = 0;
-
-    // Actualizar ETA y distancia
-    const distance = this.realtimeService['calculateDistance'](
-      vehicle.position.lat,
-      vehicle.position.lng,
-      targetLat,
-      targetLng
-    );
-
-    vehicle.position.distance = distance;
-    vehicle.position.distanceToDestination = distance;
-    vehicle.position.eta = Math.ceil((distance / vehicle.position.speed) * 60);
-
-    // Actualizar polyline de la ruta
-    if (vehicle.routePolyline && this.map) {
-      this.map.removeLayer(vehicle.routePolyline);
-    }
-    vehicle.routePolyline = this.createRoutePolyline(vehicle.path);
-
-    console.log(`🎯 Nuevo destino asignado a ${vehicle.position.vehicleId}`);
-  }
-
-  /**
-   * Crear marcador de vehículo
-   */
-  private createVehicleMarker(position: VehiclePosition): L.Marker {
     const icon = this.createVehicleIcon(position);
-    const marker = L.marker([position.lat, position.lng], { icon });
-
-    if (this.map) {
-      marker.addTo(this.map);
-    }
-
-    const popupContent = this.createPopupContent(position);
-    marker.bindPopup(popupContent);
-
-    return marker;
+    return L.marker([position.latitude, position.longitude], {
+      icon,
+      zIndexOffset: 1000
+    }).addTo(this.map);
   }
 
-  /**
-   * Crear polyline para la ruta del vehículo
-   */
-  private createRoutePolyline(path: [number, number][]): L.Polyline | undefined {
-    if (!this.map || path.length < 2) return undefined;
-
-    const latlngs = path.map(point => L.latLng(point[0], point[1]));
-
-    const polyline = L.polyline(latlngs, {
-      color: '#3b82f6',
-      weight: 3,
-      opacity: 0.6,
-      dashArray: '5, 10',
-      lineJoin: 'round',
-      lineCap: 'round'
-    });
-
-    polyline.addTo(this.map);
-    return polyline;
-  }
-
-  /**
-   * Crear icono de vehículo con rotación
-   */
   private createVehicleIcon(position: VehiclePosition): L.DivIcon {
-    const colors: any = {
-      'AVAILABLE': '#22c55e',
-      'BUSY': '#f59e0b',
-      'OFFLINE': '#6b7280'
-    };
-    const color = colors[position.status] || '#3b82f6';
+    const color = position.status === 'BUSY' ? '#3b82f6' : '#22c55e';
+    const rotation = position.heading || 0;
 
     return L.divIcon({
       html: `
-        <div class="vehicle-marker-realtime" style="transform: rotate(${position.heading || 0}deg);">
-          <div class="vehicle-icon" style="background: ${color};">
-            🚚
+        <div class="vehicle-marker-indrive" style="transform: rotate(${rotation}deg);">
+          <div class="vehicle-body" style="background: ${color};">
+            <span class="vehicle-icon">🚗</span>
           </div>
-          <div class="pulse-ring" style="border-color: ${color};"></div>
+          <div class="vehicle-shadow"></div>
         </div>
       `,
-      className: '',
-      iconSize: [40, 40],
-      iconAnchor: [20, 20]
+      className: 'custom-vehicle-marker',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16]
     });
   }
 
-  /**
-   * Crear contenido del popup
-   */
-  private createPopupContent(position: VehiclePosition): string {
-    const statusColors: any = {
-      'AVAILABLE': '#22c55e',
-      'BUSY': '#f59e0b',
-      'OFFLINE': '#6b7280'
-    };
-    const statusColor = statusColors[position.status] || '#3b82f6';
-
-    const statusTexts: any = {
-      'AVAILABLE': 'Disponible',
-      'BUSY': 'En ruta',
-      'OFFLINE': 'Desconectado'
-    };
-    const statusText = statusTexts[position.status] || 'Desconocido';
-
-    return `
-      <div class="vehicle-popup-realtime">
-        <h4>🚚 ${position.vehicleName}</h4>
-        <div class="popup-status" style="background: ${statusColor}20; color: ${statusColor};">
-          ${statusText}
+  private updatePopup(marker: L.Marker, vehicle: SimulatedVehicle) {
+    marker.bindPopup(`
+      <div class="vehicle-popup-indrive">
+        <div class="popup-header">
+          <h4>🚗 ${vehicle.position.driverName}</h4>
+          <span class="status-badge" style="background: #3b82f620; color: #3b82f6;">En ruta</span>
         </div>
-        <div class="popup-info">
-          <p><strong>Velocidad:</strong> ${position.speed.toFixed(1)} km/h</p>
-          ${position.eta ? `<p><strong>ETA:</strong> ${position.eta} min</p>` : ''}
-          ${position.distance ? `<p><strong>Distancia:</strong> ${position.distance.toFixed(1)} km</p>` : ''}
-          <p><strong>Actualizado:</strong> ${this.getTimeAgo(position.lastUpdate)}</p>
+        <div class="popup-body">
+          <div class="info-row">
+            <span class="label">Ruta:</span>
+            <span class="value">${vehicle.routeName}</span>
+          </div>
+          <div class="info-row">
+            <span class="label">Velocidad:</span>
+            <span class="value">${vehicle.speed} km/h</span>
+          </div>
+          <div class="info-row">
+            <span class="label">Paradas:</span>
+            <span class="value">${vehicle.currentStopIndex}/${vehicle.stops.length}</span>
+          </div>
         </div>
       </div>
-    `;
+    `);
   }
 
-  /**
-   * Calcular "hace cuánto"
-   */
-  private getTimeAgo(timestamp: Date): string {
-    const now = new Date().getTime();
-    const time = new Date(timestamp).getTime();
-    const diff = Math.floor((now - time) / 1000);
-
-    if (diff < 5) return 'Ahora mismo';
-    if (diff < 60) return `Hace ${diff}s`;
-    return 'Hace un momento';
+  private extractDriverId(route: any): string {
+    if (route.driverId) return route.driverId;
+    if (route.driver?.id) return route.driver.id;
+    return `DRIVER-${route.id}`;
   }
 
-  /**
-   * Generar número aleatorio en un rango
-   */
-  private randomInRange(min: number, max: number): number {
-    return min + Math.random() * (max - min);
+  private extractDriverName(route: any): string {
+    if (!route.driver) return 'Conductor';
+
+    if (typeof route.driver === 'string') {
+      return route.driver.split('-')[0]?.trim() || route.driver;
+    }
+
+    if (route.driver.nombre && route.driver.apellido) {
+      return `${route.driver.nombre} ${route.driver.apellido}`;
+    }
+
+    return route.driver.name || 'Conductor';
   }
-}
+
+  private calculateHeading(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const dLng = lng2 - lng1;
+    const y = Math.sin(dLng) * Math.cos(lat2);
+    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+    let heading = Math.atan2(y, x) * (180 / Math.PI);
+    return (heading + 360) % 360;
+  }
+} 

@@ -2,7 +2,9 @@
 
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 import { Driver } from '../../models/driver.model';
+import Swal from 'sweetalert2';
 
 @Component({
   selector: 'app-driver-card',
@@ -13,24 +15,20 @@ import { Driver } from '../../models/driver.model';
 })
 export class DriverCardComponent {
   @Input() driver!: Driver;
-  @Output() view = new EventEmitter<string>();
   @Output() edit = new EventEmitter<string>();
   @Output() delete = new EventEmitter<Driver>();
+  @Output() view = new EventEmitter<string>();
 
-  onView(): void {
-    this.view.emit(this.driver.id);
-  }
+  constructor(private router: Router) {}
 
-  onEdit(): void {
-    this.edit.emit(this.driver.id);
-  }
-
-  onDelete(): void {
-    this.delete.emit(this.driver);
+  // Utility methods for the template
+  getInitials(): string {
+    if (!this.driver) return '';
+    return `${this.driver.nombre?.charAt(0) || ''}${this.driver.apellido?.charAt(0) || ''}`.toUpperCase();
   }
 
   getEstadoBadgeClass(): string {
-    switch (this.driver.estado) {
+    switch (this.driver?.estado) {
       case 'ACTIVO':
         return 'badge-success';
       case 'INACTIVO':
@@ -43,7 +41,7 @@ export class DriverCardComponent {
   }
 
   getDisponibilidadBadgeClass(): string {
-    switch (this.driver.disponibilidad) {
+    switch (this.driver?.disponibilidad) {
       case 'DISPONIBLE':
         return 'badge-success';
       case 'EN_RUTA':
@@ -56,30 +54,45 @@ export class DriverCardComponent {
   }
 
   formatDisponibilidad(): string {
-    return this.driver.disponibilidad.replace('_', ' ');
-  }
-
-  getInitials(): string {
-    return this.driver.nombre.charAt(0) + this.driver.apellido.charAt(0);
-  }
-
-  getStatusIcon(): string {
-    if (!this.driver.licenciaVigente) {
-      return 'fa-exclamation-circle';
-    }
-    if (this.driver.disponibleParaRuta) {
-      return 'fa-check-circle';
-    }
-    return 'fa-info-circle';
+    return this.driver?.disponibilidad?.replace('_', ' ') || '';
   }
 
   getStatusColor(): string {
-    if (!this.driver.licenciaVigente) {
-      return 'status-error';
+    switch (this.driver?.disponibilidad) {
+      case 'DISPONIBLE':
+        return 'status-available';
+      case 'EN_RUTA':
+        return 'status-busy';
+      case 'DESCANSO':
+        return 'status-rest';
+      default:
+        return 'status-offline';
     }
-    if (this.driver.disponibleParaRuta) {
-      return 'status-success';
+  }
+
+  getStatusIcon(): string {
+    switch (this.driver?.disponibilidad) {
+      case 'DISPONIBLE':
+        return 'fa-check-circle';
+      case 'EN_RUTA':
+        return 'fa-route';
+      case 'DESCANSO':
+        return 'fa-bed';
+      default:
+        return 'fa-times-circle';
     }
-    return 'status-warning';
+  }
+
+  // Event handlers
+  onView(): void {
+    this.view.emit(this.driver.id);
+  }
+
+  onEdit(): void {
+    this.edit.emit(this.driver.id);
+  }
+
+  onDelete(): void {
+    this.delete.emit(this.driver);
   }
 }
