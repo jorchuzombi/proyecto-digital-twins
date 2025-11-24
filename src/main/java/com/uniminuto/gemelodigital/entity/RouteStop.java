@@ -1,138 +1,178 @@
 package com.uniminuto.gemelodigital.entity;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-
+import java.time.LocalTime;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "route_stops", indexes = {
-        @Index(name = "idx_route_id", columnList = "route_id"),
-        @Index(name = "idx_stop_order", columnList = "stop_order")
-})
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
+@Table(name = "route_stops")
 public class RouteStop {
 
+    public enum StopType {
+        PICKUP, DELIVERY, STOP // Usar los mismos valores que en la BD
+    }
+
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private String id;
+    private String id; // Cambiar de Long a String
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "route_id", nullable = false)
-    @JsonBackReference
-    @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private Route route;
 
-    @Column(nullable = false, length = 200)
-    private String name;
-
-    @Column(nullable = false, length = 300)
-    private String address;
-
-    @Column(nullable = false)
-    private Double latitude;
-
-    @Column(nullable = false)
-    private Double longitude;
-
-    // ✅ ENUM ACTIVO - Con @Enumerated y @Column
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20, name = "type")
-    @Builder.Default
-    private StopType type = StopType.STOP; // ✅ ACTIVA: valor por defecto
-
-    @Column(nullable = false, name = "stop_order")
+    @Column(name = "stop_order", nullable = false)
     private Integer stopOrder;
 
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "name", nullable = false, length = 200)
+    private String name;
+
+    @Column(name = "address", nullable = false, length = 300) // NOT NULL en BD
+    private String address;
+
+    @Column(name = "latitude", nullable = false)
+    private Double latitude;
+
+    @Column(name = "longitude", nullable = false)
+    private Double longitude;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type", nullable = false)
+    private StopType type;
+
+    @Column(name = "estimated_arrival_time")
+    private LocalTime estimatedArrivalTime;
+
+    @Column(name = "wait_time_minutes")
+    private Integer waitTimeMinutes;
+
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    // ✅ ENUM StopType - COMPLETAMENTE ACTIVO
-    public enum StopType {
-        PICKUP,     // ✅ Usado en: Builder.Default, isPickup(), setAsPickup()
-        DELIVERY,   // ✅ Usado en: isDelivery(), setAsDelivery()
-        STOP        // ✅ Usado en: isStop(), setAsStop()
+    // Constructores
+    public RouteStop() {}
+
+    public RouteStop(String id, Route route, Integer stopOrder, String name, String address,
+                     Double latitude, Double longitude, StopType type) {
+        this.id = id;
+        this.route = route;
+        this.stopOrder = stopOrder;
+        this.name = name;
+        this.address = address;
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.type = type;
+        this.createdAt = LocalDateTime.now();
     }
 
-    // ✅ MÉTODOS DE VERIFICACIÓN - Activan PICKUP, DELIVERY, STOP
-    public boolean isPickup() {
-        return this.type == StopType.PICKUP;
+    // PrePersist para generar ID automáticamente si es necesario
+    @PrePersist
+    public void generateId() {
+        if (this.id == null) {
+            this.id = java.util.UUID.randomUUID().toString();
+        }
+        if (this.createdAt == null) {
+            this.createdAt = LocalDateTime.now();
+        }
     }
 
-    public boolean isDelivery() {
-        return this.type == StopType.DELIVERY;
+    // Getters y Setters (ACTUALIZADOS)
+    public String getId() {
+        return id;
     }
 
-    public boolean isStop() {
-        return this.type == StopType.STOP;
+    public void setId(String id) {
+        this.id = id;
     }
 
-    // ✅ MÉTODOS DE CONFIGURACIÓN - Activan todos los valores del enum
-    public void setAsPickup() {
-        this.type = StopType.PICKUP;
+    public Route getRoute() {
+        return route;
     }
 
-    public void setAsDelivery() {
-        this.type = StopType.DELIVERY;
+    public void setRoute(Route route) {
+        this.route = route;
     }
 
-    public void setAsStop() {
-        this.type = StopType.STOP;
+    public Integer getStopOrder() {
+        return stopOrder;
     }
 
-    // ✅ MÉTODO CON SWITCH - Activa todos los valores
-    public String getTypeDescription() {
-        return switch (this.type) {
-            case PICKUP -> "Punto de Recogida";
-            case DELIVERY -> "Punto de Entrega";
-            case STOP -> "Parada Intermedia";
-        };
+    public void setStopOrder(Integer stopOrder) {
+        this.stopOrder = stopOrder;
     }
 
-    // ✅ MÉTODO CON SWITCH - Retorna icono según tipo
-    public String getTypeIcon() {
-        return switch (this.type) {
-            case PICKUP -> "📦";
-            case DELIVERY -> "🚚";
-            case STOP -> "🛑";
-        };
+    public String getName() {
+        return name;
     }
 
-    // ✅ MÉTODO - Validar tipo de parada
-    public boolean isValidType() {
-        return this.type == StopType.PICKUP ||
-                this.type == StopType.DELIVERY ||
-                this.type == StopType.STOP;
+    public void setName(String name) {
+        this.name = name;
     }
 
-    // ✅ MÉTODO - Cambiar tipo de parada
-    public void changeType(StopType newType) {
-        this.type = newType;
+    public String getAddress() {
+        return address;
     }
 
-    // ✅ MÉTODO - Obtener nombre completo de la parada
-    public String getFullDescription() {
-        return String.format("%s %s - %s",
-                getTypeIcon(),
-                getTypeDescription(),
-                this.name
-        );
+    public void setAddress(String address) {
+        this.address = address;
     }
 
-    // ✅ MÉTODO - Verificar si es primera parada
-    public boolean isFirstStop() {
-        return this.stopOrder != null && this.stopOrder == 1;
+    public Double getLatitude() {
+        return latitude;
     }
 
-    // ✅ MÉTODO - Verificar si es última parada
-    public boolean isLastStop(int totalStops) {
-        return this.stopOrder != null && this.stopOrder == totalStops;
+    public void setLatitude(Double latitude) {
+        this.latitude = latitude;
+    }
+
+    public Double getLongitude() {
+        return longitude;
+    }
+
+    public void setLongitude(Double longitude) {
+        this.longitude = longitude;
+    }
+
+    public StopType getType() {
+        return type;
+    }
+
+    public void setType(StopType type) {
+        this.type = type;
+    }
+
+    public LocalTime getEstimatedArrivalTime() {
+        return estimatedArrivalTime;
+    }
+
+    public void setEstimatedArrivalTime(LocalTime estimatedArrivalTime) {
+        this.estimatedArrivalTime = estimatedArrivalTime;
+    }
+
+    public Integer getWaitTimeMinutes() {
+        return waitTimeMinutes;
+    }
+
+    public void setWaitTimeMinutes(Integer waitTimeMinutes) {
+        this.waitTimeMinutes = waitTimeMinutes;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    @Override
+    public String toString() {
+        return "RouteStop{" +
+                "id='" + id + '\'' +
+                ", stopOrder=" + stopOrder +
+                ", name='" + name + '\'' +
+                ", address='" + address + '\'' +
+                ", latitude=" + latitude +
+                ", longitude=" + longitude +
+                ", type=" + type +
+                '}';
     }
 }

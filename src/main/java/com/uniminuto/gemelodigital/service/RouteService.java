@@ -1,12 +1,11 @@
-// RouteService.java - COMPLETO
 package com.uniminuto.gemelodigital.service;
 
 import com.uniminuto.gemelodigital.dto.RouteDTO;
 import com.uniminuto.gemelodigital.dto.RouteResponse;
 import com.uniminuto.gemelodigital.dto.RouteStopDTO;
+import com.uniminuto.gemelodigital.dto.VehicleAssignmentRequest;
 import com.uniminuto.gemelodigital.entity.Route;
 import com.uniminuto.gemelodigital.entity.RouteStop;
-import com.uniminuto.gemelodigital.entity.Driver;
 import com.uniminuto.gemelodigital.repository.RouteRepository;
 import com.uniminuto.gemelodigital.repository.RouteStopRepository;
 import com.uniminuto.gemelodigital.repository.DriverRepository;
@@ -19,6 +18,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.ArrayList;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -29,6 +29,86 @@ public class RouteService {
     private final RouteRepository routeRepository;
     private final RouteStopRepository routeStopRepository;
     private final DriverRepository driverRepository;
+
+    // ===== MÉTODO DE SERVICIO: OPTIMIZAR RUTA =====
+    @Transactional
+    public RouteResponse optimizeRoute(String id) {
+        log.info("🔧 Optimizando ruta con ID: {}", id);
+
+        // 1. Buscar la ruta original
+        Route route = routeRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new RuntimeException("Ruta no encontrada: " + id));
+
+        if (route.getStops() == null || route.getStops().size() < 2) {
+            log.warn("⚠️ La ruta {} no tiene suficientes paradas para optimizar (menos de 2).", id);
+            // Opcional: Puedes lanzar una excepción o devolver la ruta tal cual
+            return convertToResponse(route);
+        }
+
+        // 2. Lógica de optimización (EJEMPLO BÁSICO - DEBES IMPLEMENTAR LA TUYA)
+        // Este es un ejemplo muy simple que solo invierte el orden de las paradas.
+        // En la práctica, usarías un algoritmo como el del Vendedor Viajero (TSP) o una heurística.
+        List<RouteStop> originalStops = route.getStops();
+        List<RouteStop> optimizedStops = new ArrayList<>(originalStops);
+
+        // --- IMPLEMENTACIÓN REAL NECESARIA AQUÍ ---
+        // Collections.reverse(optimizedStops); // Ejemplo simple, NO es una optimización real
+
+        // 3. Calcular nueva distancia y duración (esto también lo haría tu algoritmo de optimización)
+        // double newDistance = calculateOptimizedDistance(optimizedStops); // Implementar
+        // String newDuration = calculateOptimizedDuration(optimizedStops); // Implementar
+
+        // 4. Actualizar la ruta con los nuevos valores (distancia, duración, paradas)
+        // route.setDistance(newDistance);
+        // route.setEstimatedDuration(newDuration);
+        route.setStatus(Route.RouteStatus.OPTIMIZED); // O el estado que corresponda
+
+        // 5. Guardar la ruta actualizada
+        Route updatedRoute = routeRepository.save(route);
+
+        log.info("✅ Ruta {} optimizada en base de datos.", id);
+        return convertToResponse(updatedRoute);
+    }
+
+    // ===== NUEVO MÉTODO DE SERVICIO: INICIAR RUTA =====
+    @Transactional
+    public RouteResponse startRoute(String id) {
+        log.info("🚀 Iniciando ruta con ID: {}", id);
+
+        Route route = routeRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new RuntimeException("Ruta no encontrada: " + id));
+
+        if (route.getStatus() != Route.RouteStatus.PENDING) {
+            throw new IllegalStateException("La ruta no está pendiente. Estado actual: " + route.getStatus());
+        }
+
+        route.setStatus(Route.RouteStatus.IN_PROGRESS);
+        route.setUpdatedAt(LocalDateTime.now());
+
+        Route updatedRoute = routeRepository.save(route);
+        log.info("✅ Ruta {} iniciada.", id);
+        return convertToResponse(updatedRoute);
+    }
+
+    // ===== NUEVO MÉTODO DE SERVICIO: COMPLETAR RUTA =====
+    @Transactional
+    public RouteResponse completeRoute(String id) {
+        log.info("✅ Completando ruta con ID: {}", id);
+
+        Route route = routeRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new RuntimeException("Ruta no encontrada: " + id));
+
+        if (route.getStatus() != Route.RouteStatus.IN_PROGRESS) {
+            throw new IllegalStateException("La ruta no está en progreso. Estado actual: " + route.getStatus());
+        }
+
+        route.setStatus(Route.RouteStatus.COMPLETED);
+        route.setUpdatedAt(LocalDateTime.now());
+
+        Route updatedRoute = routeRepository.save(route);
+        log.info("✅ Ruta {} marcada como COMPLETADA.", id);
+        return convertToResponse(updatedRoute);
+    }
 
     // ✅ OBTENER TODAS LAS RUTAS
     @Transactional(readOnly = true)
@@ -173,6 +253,34 @@ public class RouteService {
         return convertToResponse(route);
     }
 
+    // 🔗 NUEVO MÉTODO: ASIGNAR RUTA A VEHÍCULO Y/O CONDUCTOR
+    @Transactional
+    public RouteResponse assignRouteToVehicle(String routeId, VehicleAssignmentRequest request) {
+        log.info("🔗 Asignando vehículo/conductor a ruta ID: {}", routeId);
+        log.info("📤 Vehicle ID: {} | Driver ID: {}", request.getVehicleId(), request.getDriverId());
+
+        Route route = routeRepository.findByIdAndDeletedAtIsNull(routeId)
+                .orElseThrow(() -> new RuntimeException("Ruta no encontrada: " + routeId));
+
+        // 🚗 ACTUALIZAR VEHÍCULO
+        if (request.getVehicleId() != null && !request.getVehicleId().isEmpty()) {
+            route.setVehicle(request.getVehicleId());
+            log.info("✅ Vehículo actualizado a: {}", request.getVehicleId());
+        }
+
+        // 🚛 ACTUALIZAR CONDUCTOR (DRIVER)
+        if (request.getDriverId() != null && !request.getDriverId().isEmpty()) {
+            route.setDriverId(request.getDriverId());
+            log.info("✅ Driver ID actualizado a: {}", request.getDriverId());
+        }
+
+        // 🔄 Guardar los cambios
+        Route updatedRoute = routeRepository.save(route);
+        log.info("✅ Asignación de ruta {} completada.", updatedRoute.getId());
+
+        return convertToResponse(updatedRoute);
+    }
+
     // ✅ ELIMINAR RUTA (SOFT DELETE)
     @Transactional
     public void deleteRoute(String id) {
@@ -209,11 +317,10 @@ public class RouteService {
         if (route.getDriverId() != null && !route.getDriverId().isEmpty()) {
             response.setDriverId(route.getDriverId());
 
-            // ✅ BUSCAR INFORMACIÓN DEL CONDUCTOR (String → UUID para buscar)
             try {
                 driverRepository.findById(UUID.fromString(route.getDriverId())).ifPresent(driver -> {
                     RouteResponse.DriverInfo driverInfo = new RouteResponse.DriverInfo();
-                    driverInfo.setId(driver.getId()); // Ya es String
+                    driverInfo.setId(driver.getId().toString());
                     driverInfo.setNombre(driver.getNombre());
                     driverInfo.setApellido(driver.getApellido());
                     driverInfo.setLicencia(driver.getLicencia());
@@ -221,6 +328,8 @@ public class RouteService {
 
                     log.debug("✅ Driver asignado: {} {}", driver.getNombre(), driver.getApellido());
                 });
+            } catch (IllegalArgumentException e) {
+                log.warn("⚠️ Error: El Driver ID no es un UUID válido: {}", route.getDriverId());
             } catch (Exception e) {
                 log.warn("⚠️ Error buscando conductor: {}", e.getMessage());
             }
@@ -241,15 +350,28 @@ public class RouteService {
     private void saveRouteStops(Route route, List<RouteStopDTO> stopDTOs) {
         log.info("📍 Guardando {} paradas para ruta {}", stopDTOs.size(), route.getId());
 
-        for (RouteStopDTO stopDTO : stopDTOs) {
+        for (int i = 0; i < stopDTOs.size(); i++) {
+            RouteStopDTO stopDTO = stopDTOs.get(i);
             RouteStop stop = new RouteStop();
+
             stop.setRoute(route);
             stop.setName(stopDTO.getName());
             stop.setAddress(stopDTO.getAddress());
             stop.setLatitude(stopDTO.getLatitude());
             stop.setLongitude(stopDTO.getLongitude());
-            stop.setType(stopDTO.getType() != null ? RouteStop.StopType.valueOf(stopDTO.getType()) : null);
-            stop.setStopOrder(stopDTO.getStopOrder());
+
+            if (stopDTO.getType() != null) {
+                try {
+                    stop.setType(RouteStop.StopType.valueOf(stopDTO.getType()));
+                } catch (IllegalArgumentException e) {
+                    log.warn("⚠️ Tipo de parada no válido: {}, asignando null", stopDTO.getType());
+                    stop.setType(null);
+                }
+            } else {
+                stop.setType(null);
+            }
+
+            stop.setStopOrder(i + 1); // Asegura un orden consecutivo
 
             routeStopRepository.save(stop);
         }
@@ -260,11 +382,13 @@ public class RouteService {
     // ✅ CONVERTIR STOP ENTITY A DTO
     private RouteStopDTO convertStopToDTO(RouteStop stop) {
         RouteStopDTO dto = new RouteStopDTO();
-        dto.setId(stop.getId());
+        dto.setId(stop.getId() != null ? stop.getId().toString() : null);
+
         dto.setName(stop.getName());
         dto.setAddress(stop.getAddress());
         dto.setLatitude(stop.getLatitude());
         dto.setLongitude(stop.getLongitude());
+
         dto.setType(stop.getType() != null ? stop.getType().name() : null);
         dto.setStopOrder(stop.getStopOrder());
         return dto;

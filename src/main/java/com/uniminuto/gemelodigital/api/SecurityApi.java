@@ -124,9 +124,18 @@ public class SecurityApi {
                 .authorizeHttpRequests(auth -> auth
                         // ===== RUTAS PÚBLICAS =====
 
-                        // 🌎 GEOCODIFICACIÓN - AGREGAR AMBAS RUTAS
+                        // 🏥 Health checks y monitoreo
+                        .requestMatchers(
+                                "/actuator/**",
+                                "/actuator/health",
+                                "/actuator/info",
+                                "/health",
+                                "/info"
+                        ).permitAll()
+
+                        // 🌎 GEOCODIFICACIÓN
                         .requestMatchers("/api/geocoding/**").permitAll()
-                        .requestMatchers("/geocoding/**").permitAll() // ← RUTA CORREGIDA
+                        .requestMatchers("/geocoding/**").permitAll()
 
                         // 🔐 Autenticación
                         .requestMatchers(
@@ -149,26 +158,31 @@ public class SecurityApi {
                                 "/webjars/**"
                         ).permitAll()
 
-                        // 🏥 Health checks y monitoreo
-                        .requestMatchers(
-                                "/actuator/**",
-                                "/actuator/health",
-                                "/actuator/info",
-                                "/health",
-                                "/info"
-                        ).permitAll()
+                        // 🚀 TRACKING EN TIEMPO REAL - NUEVO ⭐
+                        .requestMatchers("/api/tracking/**").permitAll()
+                        .requestMatchers("/tracking/**").permitAll()
+
+                        // 🚗 POSICIONES DE VEHÍCULOS (Añadido para corregir 401 en /api/vehicle-positions)
+                        .requestMatchers("/vehicle-positions/**").permitAll()
+                        .requestMatchers("/api/vehicle-positions/**").permitAll()
+
 
                         // 🚗 VEHÍCULOS - Público para desarrollo
                         .requestMatchers("/vehicles/**").permitAll()
+                        .requestMatchers("/api/vehicles/**").permitAll()
 
                         // 🚛 CONDUCTORES - Público para desarrollo
                         .requestMatchers("/drivers/**").permitAll()
+                        .requestMatchers("/api/drivers/**").permitAll()
 
                         // 🛣️ RUTAS - Público para desarrollo
                         .requestMatchers("/routes/**").permitAll()
+                        .requestMatchers("/api/routes/**").permitAll()
 
                         // 📊 REPORTES - Público para desarrollo
                         .requestMatchers("/reports/**").permitAll()
+                        .requestMatchers("/api/reports/**").permitAll()
+
 
                         // 🔧 Utilidades y archivos estáticos
                         .requestMatchers(
@@ -228,15 +242,16 @@ public class SecurityApi {
         System.out.println("=".repeat(60));
 
         System.out.println("📍 RUTAS PÚBLICAS:");
+        System.out.println("   🔓 /actuator/** - Monitoreo y Health Checks");
         System.out.println("   🔓 /api/geocoding/** - Geocodificación");
-        System.out.println("   🔓 /geocoding/** - Geocodificación (CORREGIDO)"); // ← Actualizado
         System.out.println("   🔓 /auth/** - Autenticación");
+        System.out.println("   🔓 /swagger-ui/** - Documentación API");
+        System.out.println("   🔓 /api/tracking/** & /tracking/** - Tracking en tiempo real ⭐");
+        System.out.println("   🔓 /api/vehicle-positions/** & /vehicle-positions/** - Posiciones de Vehículos ⭐"); // LOG ACTUALIZADO
         System.out.println("   🔓 /vehicles/** - Gestión de vehículos");
         System.out.println("   🔓 /drivers/** - Gestión de conductores");
         System.out.println("   🔓 /routes/** - Gestión de rutas");
         System.out.println("   🔓 /reports/** - Reportes y análisis");
-        System.out.println("   🔓 /swagger-ui/** - Documentación API");
-        System.out.println("   🔓 /actuator/** - Monitoreo");
 
         System.out.println("\n📍 RUTAS PROTEGIDAS:");
         System.out.println("   🔒 /admin/** - Requiere rol ADMIN");

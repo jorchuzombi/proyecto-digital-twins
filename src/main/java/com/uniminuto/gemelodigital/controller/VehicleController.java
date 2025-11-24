@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 @RequestMapping("/vehicles")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
-public class VehicleController {
+public class VehicleController {        
 
     private final VehicleRepository vehicleRepository;
     private static final Logger logger = LoggerFactory.getLogger(VehicleController.class);

@@ -1,33 +1,80 @@
-// RouteRepository.java - ACTUALIZADO para String driverId
 package com.uniminuto.gemelodigital.repository;
 
 import com.uniminuto.gemelodigital.entity.Route;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface RouteRepository extends JpaRepository<Route, String> {
+public interface RouteRepository extends JpaRepository<Route, String> { // <-- ✅ Cambiado de Long a String
 
-    // ✅ Encontrar rutas no eliminadas
+    /**
+     * ✅ Buscar por ID como String (ahora coincide con la entidad)
+     */
+    Optional<Route> findById(String id); // <-- ✅ Acepta String
+
+    /**
+     * ✅ Buscar rutas no eliminadas (soft delete)
+     */
     List<Route> findByDeletedAtIsNull();
 
-    // ✅ Encontrar ruta por ID no eliminada
-    Optional<Route> findByIdAndDeletedAtIsNull(String id);
+    /**
+     * ✅ Buscar por ID y no eliminada
+     */
+    @Query("SELECT r FROM Route r WHERE r.id = :id AND r.deletedAt IS NULL") // <-- HQL usa r.id que es String
+    Optional<Route> findByIdAndDeletedAtIsNull(@Param("id") String id); // <-- ✅ Acepta String
 
-    // ✅ Encontrar rutas por conductor (String en lugar de UUID)
-    List<Route> findByDriverIdAndDeletedAtIsNull(String driverId);
+    // ... (El resto de los métodos siguen igual, solo cambia el tipo de findById y findByIdAndDeletedAtIsNull si era Long)
+    /**
+     * ✅ Buscar por vehículo
+     */
+    List<Route> findByVehicle(String vehicle);
 
-    // ✅ Contar rutas activas
-    @Query("SELECT COUNT(r) FROM Route r WHERE r.deletedAt IS NULL")
-    long countActiveRoutes();
+    /**
+     * ✅ Buscar por driver_id
+     */
+    List<Route> findByDriverId(String driverId);
 
-    // ✅ Encontrar rutas por ciudad
-    List<Route> findByCityAndDeletedAtIsNull(String city);
+    /**
+     * ✅ Buscar por status (String)
+     */
+    List<Route> findByStatus(String status);
 
-    // ✅ Encontrar rutas por estado
-    List<Route> findByStatusAndDeletedAtIsNull(Route.RouteStatus status);
+    /**
+     * ✅ Buscar por status (Enum)
+     */
+    @Query("SELECT r FROM Route r WHERE r.status = :status")
+    List<Route> findByStatusEnum(@Param("status") Route.RouteStatus status);
+
+    /**
+     * ✅ Buscar rutas activas
+     */
+    @Query("SELECT r FROM Route r WHERE r.status IN ('PENDING', 'IN_PROGRESS')")
+    List<Route> findActiveRoutes();
+
+    /**
+     * ✅ Buscar por nombre
+     */
+    List<Route> findByNameContainingIgnoreCase(String name);
+
+    /**
+     * ✅ Verificar si existe ruta activa para vehículo
+     */
+    @Query("SELECT COUNT(r) > 0 FROM Route r WHERE r.vehicle = :vehicle AND r.status IN ('PENDING', 'IN_PROGRESS')")
+    boolean existsActiveRouteForVehicle(@Param("vehicle") String vehicle);
+
+    /**
+     * ✅ Verificar si existe ruta activa para conductor
+     */
+    @Query("SELECT COUNT(r) > 0 FROM Route r WHERE r.driverId = :driverId AND r.status IN ('PENDING', 'IN_PROGRESS')")
+    boolean existsActiveRouteForDriver(@Param("driverId") String driverId);
+
+    /**
+     * ✅ Buscar por ciudad
+     */
+    List<Route> findByCity(String city);
 }
