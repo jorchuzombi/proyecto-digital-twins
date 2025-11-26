@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Verifica tu cuenta</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+        .header { text-align: center; background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 20px; border-radius: 10px 10px 0 0; }
+        .token-box { background: #f8f9fa; border: 2px dashed #667eea; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; margin: 20px 0; }
+        .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>🔐 Gemelo Digital</h1>
+        <p>Verificación de Cuenta</p>
+    </div>
+
+    <h2>Hola, <span th:text="${username}">Usuario</span>!</h2>
+
+    <p>Para completar tu registro, utiliza el siguiente token de verificación:</p>
+
+    <div class="token-box" th:text="${verificationToken}">
+        TOKEN_AQUI
+    </div>
+
+    <p>O haz clic en el siguiente enlace:</p>
+    <a th:href="${verificationUrl}" style="background: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">
+        Verificar Mi Cuenta
+    </a>
+
+    <p><strong>Este token expirará en 24 horas.</strong></p>
+
+    <div class="footer">
+        <p>Si no solicitaste este registro, ignora este mensaje.</p>
+        <p>© 2024 Gemelo Digital. Todos los derechos reservados.</p>
+    </div>
+</div>
+</body>
+</html>

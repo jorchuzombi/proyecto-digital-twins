@@ -1,0 +1,16 @@
+{
+  "/nominatim": {
+    "target": "https://nominatim.openstreetmap.org",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug",
+    "pathRewrite": {
+      "^/nominatim": ""
+    },
+    "headers": {
+      "User-Agent": "LogisticsApp/1.0",
+      "Accept": "application/json",
+      "Accept-Language": "es"
+    }
+  }
+}
